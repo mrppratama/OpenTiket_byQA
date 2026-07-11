@@ -1052,10 +1052,10 @@
                             </div>
                         </header>
 
-                        <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
                             <div className="mx-auto w-full">
                                 {view === 'FORM' && (
-                                    <div className="bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl shadow-bauhaus border-2 border-slate-200 dark:border-slate-700 p-8 fade-in">
+                                    <div className="bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl shadow-bauhaus border-2 border-slate-200 dark:border-slate-700 p-4 md:p-8 fade-in">
                                         <h2 className="text-2xl font-bold mb-6">{t(lang, 'createNew')}</h2>
                                         <form onSubmit={handleSubmit} noValidate className="space-y-6">
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1436,7 +1436,7 @@
                             </div>
                         </header>
 
-                        <div className="flex-1 overflow-auto p-6">
+                        <div className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
                             {view === 'BOARD' && (
                                 <div className="flex gap-6 h-full items-start overflow-x-auto pb-4 fade-in">
                                     {settings.statuses.map(status => (
@@ -1482,7 +1482,7 @@
                             )}
 
                             {view === 'FORM' && (
-                                <div className="bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl shadow-bauhaus border-2 border-slate-200 dark:border-slate-700 p-8 fade-in">
+                                <div className="bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl shadow-bauhaus border-2 border-slate-200 dark:border-slate-700 p-4 md:p-8 fade-in">
                                     <h2 className="text-2xl font-bold mb-6">{t(lang, 'createNew')}</h2>
                                     <form onSubmit={handleSubmit} noValidate className="space-y-6">
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
