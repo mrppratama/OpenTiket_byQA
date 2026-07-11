@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internal Helpdesk & Bug Tracking System</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234F46E5' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3Cpath d='m9 12 2 2 4-4' stroke='%23fff'/%3E%3C/svg%3E">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#4F46E5', // Indigo 600
+                        primaryHover: '#4338CA', // Indigo 700
+                        secondary: '#10B981', // Emerald 500
+                        darkBg: '#0F172A', // Slate 900
+                        darkPanel: '#1E293B', // Slate 800
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- jsPDF & AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- CryptoJS (for SHA-256) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #F8FAFC;
+            color: #0F172A;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .dark body {
+            background-color: #0F172A;
+            color: #F8FAFC;
+        }
+
+        /* Custom Scrollbar Modern */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 10px;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .dark .glass-panel {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Drag & Drop */
+        .is-dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- ICON HELPER ---
+        const Icon = ({ name, size = 20, color = "currentColor", strokeWidth = 1.5, className = "" }) => {
+            const icons = {
+                'chevron-down': <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />,
+                'check': <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />,
+                'shield-check': <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />,
+                'layout-dashboard': <path strokeLinecap="round" strokeLinejoin="round" d="M4 4h6v8H4zm0 12h6v4H4zm10-12h6v4h-6zm0 8h6v8h-6z" />,
+                'users': <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
+                'settings': <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" />,
+                'moon': <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />,
+                'sun': <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />,
+                'search': <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />,
+                'plus': <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />,
+                'edit': <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />,
+                'trash': <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />,
+                'x': <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />,
+                'log-out': <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />,
+                'file-text': <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+                'paperclip': <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />,
+                'check': <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />,
+                'eye': <g><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></g>,
+                'clock': <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />,
+                'bell': <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />,
+                'message-square': <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />,
+                'copy': <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />,
+                'globe': <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+            };
+
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={strokeWidth} className={className}>
+                    {icons[name] || icons['layout-dashboard']}
+                </svg>
+            );
+        };
+
+        
+        // --- TRANSLATIONS ---
+        const i18n = {
+            ID: {
+                sysTitle: 'Sistem Tiket IT & QA',
+                loginDesc: 'Gunakan kredensial Anda untuk masuk.',
+                username: 'Username',
+                password: 'Password',
+                loginBtn: 'Masuk',
+                connecting: 'Menghubungkan ke server...',
+                loggingIn: 'Masuk...',
+                userPortal: 'User Portal',
+                adminPortal: 'Admin Portal',
+                history: 'Riwayat Tiket',
+                createTicket: 'Buat Tiket',
+                logout: 'Keluar',
+                light: 'Terang',
+                dark: 'Gelap',
+                myHistory: 'Riwayat Tiket Saya',
+                createNew: 'Buat Tiket Baru',
+                createNow: 'Buat Tiket Sekarang',
+                noTickets: 'Belum ada tiket yang dibuat.',
+                appModule: 'Aplikasi / Modul',
+                catPriority: 'Kategori / Prioritas',
+                probDetail: 'Detail Masalah',
+                attachment: 'Lampiran (Screenshot / Video)',
+                submitTicket: 'Kirim Tiket',
+                selectApp: 'Pilih Aplikasi',
+                kanbanBoard: 'Kanban Board',
+                manageUsers: 'Manage Users',
+                settings: 'Pengaturan',
+                sysSettings: 'Pengaturan Sistem',
+                searchTickets: 'Cari tiket...',
+                addUser: 'Tambah User',
+                newNotif: 'Notifikasi Tiket Baru',
+                noNewTickets: 'Tidak ada tiket baru.',
+                feedback: 'Feedback / Catatan IT',
+                updateTicket: 'Update Tiket',
+                priority: 'Priority',
+                assignee: 'Assignee',
+                dateEntered: 'Tgl Masuk',
+                reporter: 'Reporter',
+                viewDetails: 'Lihat Detail Lengkap',
+                langInfo: 'Bahasa'
+            },
+            MY: {
+                sysTitle: 'Sistem Tiket IT & QA',
+                loginDesc: 'Gunakan butiran anda untuk log masuk.',
+                username: 'Nama Pengguna',
+                password: 'Kata Laluan',
+                loginBtn: 'Log Masuk',
+                connecting: 'Menyambung ke pelayan...',
+                loggingIn: 'Log masuk...',
+                userPortal: 'Portal Pengguna',
+                adminPortal: 'Portal Pentadbir',
+                history: 'Sejarah Tiket',
+                createTicket: 'Cipta Tiket',
+                logout: 'Log Keluar',
+                light: 'Cerah',
+                dark: 'Gelap',
+                myHistory: 'Sejarah Tiket Saya',
+                createNew: 'Cipta Tiket Baru',
+                createNow: 'Cipta Tiket Sekarang',
+                noTickets: 'Tiada tiket dicipta lagi.',
+                appModule: 'Aplikasi / Modul',
+                catPriority: 'Kategori / Keutamaan',
+                probDetail: 'Butiran Masalah',
+                attachment: 'Lampiran (Tangkapan Skrin / Video)',
+                submitTicket: 'Hantar Tiket',
+                selectApp: 'Pilih Aplikasi',
+                kanbanBoard: 'Papan Kanban',
+                manageUsers: 'Urus Pengguna',
+                settings: 'Tetapan',
+                sysSettings: 'Tetapan Sistem',
+                searchTickets: 'Cari tiket...',
+                addUser: 'Tambah Pengguna',
+                newNotif: 'Notifikasi Tiket Baru',
+                noNewTickets: 'Tiada tiket baru.',
+                feedback: 'Maklum Balas / Catatan IT',
+                updateTicket: 'Kemaskini Tiket',
+                priority: 'Keutamaan',
+                assignee: 'Penerima Tugas',
+                dateEntered: 'Tarikh Masuk',
+                reporter: 'Pelapor',
+                viewDetails: 'Lihat Butiran Penuh',
+                langInfo: 'Bahasa'
+            },
+            EN: {
+                sysTitle: 'IT & QA Ticket System',
+                loginDesc: 'Use your credentials to login.',
+                username: 'Username',
+                password: 'Password',
+                loginBtn: 'Login',
+                connecting: 'Connecting to server...',
+                loggingIn: 'Logging in...',
+                userPortal: 'User Portal',
+                adminPortal: 'Admin Portal',
+                history: 'Ticket History',
+                createTicket: 'Create Ticket',
+                logout: 'Logout',
+                light: 'Light',
+                dark: 'Dark',
+                myHistory: 'My Ticket History',
+                createNew: 'Create New Ticket',
+                createNow: 'Create Ticket Now',
+                noTickets: 'No tickets created yet.',
+                appModule: 'App / Module',
+                catPriority: 'Category / Priority',
+                probDetail: 'Problem Detail',
+                attachment: 'Attachment (Screenshot / Video)',
+                submitTicket: 'Submit Ticket',
+                selectApp: 'Select App',
+                kanbanBoard: 'Kanban Board',
+                manageUsers: 'Manage Users',
+                settings: 'Settings',
+                sysSettings: 'System Settings',
+                searchTickets: 'Search tickets...',
+                addUser: 'Add User',
+                newNotif: 'New Ticket Notification',
+                noNewTickets: 'No new tickets.',
+                feedback: 'IT Feedback / Notes',
+                updateTicket: 'Update Ticket',
+                priority: 'Priority',
+                assignee: 'Assignee',
+                dateEntered: 'Date Entered',
+                reporter: 'Reporter',
+                viewDetails: 'View Full Details',
+                langInfo: 'Language'
+            }
+        };
+
+        const t = (lang, key) => (i18n[lang] && i18n[lang][key]) || key;
+
+        // --- GLOBAL CONFIG & API ---
+        const TICKET_STATUSES = ['Open', 'Assigned', 'In Progress', 'Ready For Testing', 'Done'];
+        const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
+
+        // =========================================================================
+        // MASUKKAN GOOGLE APPS SCRIPT WEB APP URL ANDA DI BAWAH INI
+        // =========================================================================
+        const HARDCODED_API_URL = 'https://script.google.com/macros/s/AKfycbyBzEfRmSNbzseN5L3TNPBSMUoidx0CI0WrI7edT2uhlYIxMppMdCVSTm89AAsTwV9j1w/exec'; // Paste URL Web App di antara tanda kutip tunggal ini
+        const DEFAULT_SHEET_ID = '1rlY94-vv5RRx3G2shKvHbt_PIlyTkJ-you91-f2hovU';
+        const DEFAULT_FOLDER_ID = '1vidvhugjko6O8iLCABHr1z1lDtaylY-O';
+        // =========================================================================
+
+        function hashPassword(password) {
+            return CryptoJS.SHA256(password).toString();
+        }
+
+        // Custom API fetcher
+        async function apiCall(config, action, data = {}) {
+            const apiUrl = HARDCODED_API_URL || config.api;
+            if (!apiUrl) throw new Error("API URL is not configured");
+
+            const payload = {
+                action,
+                sheetId: DEFAULT_SHEET_ID || config.sheetId,
+                folderId: DEFAULT_FOLDER_ID || config.folderId,
+                ...data
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (!result.success) throw new Error(result.message);
+                return result.data;
+            } catch (error) {
+                console.error("API Error:", error);
+                throw new Error("Koneksi gagal: " + error.message + ". (Cek Console F12 untuk detailnya)");
+            }
+        }
+
+        // Setup Screen Component
+        const SetupScreen = ({ config, setConfig, setAppState, showToast, apiCall }) => {
+            const [form, setForm] = useState(config);
+            const [setupLoading, setSetupLoading] = useState(false);
+
+            const handleSetup = async (e) => {
+                e.preventDefault();
+                setSetupLoading(true);
+                try {
+                    await apiCall(form, 'setup');
+                    localStorage.setItem('appConfig', JSON.stringify(form));
+                    setConfig(form);
+                    setAppState('LOGIN');
+                    showToast('Database berhasil disetup!', 'success');
+                } catch (error) {
+                    showToast(error.message, 'error');
+                } finally {
+                    setSetupLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md fade-in border border-slate-200 dark:border-slate-700">
+                        <div className="flex justify-center mb-6">
+                            <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/50 text-primary rounded-2xl flex items-center justify-center">
+                                <Icon name="settings" size={32} />
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-center mb-2">Setup System</h2>
+                        <p className="text-slate-500 text-center mb-6 text-sm">Masukkan parameter integrasi Google Apps Script.</p>
+
+                        <form onSubmit={handleSetup} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Google Apps Script Web App URL</label>
+                                <input required type="url" className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary focus:border-primary outline-none transition" value={form.api} onChange={e => setForm({ ...form, api: e.target.value })} placeholder="https://script.google.com/macros/s/..." />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Spreadsheet ID</label>
+                                <input required type="text" className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary focus:border-primary outline-none transition" value={form.sheetId} onChange={e => setForm({ ...form, sheetId: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Google Drive Folder ID (Lampiran)</label>
+                                <input required type="text" className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary focus:border-primary outline-none transition" value={form.folderId} onChange={e => setForm({ ...form, folderId: e.target.value })} />
+                            </div>
+                            <button type="submit" disabled={setupLoading} className="w-full bg-primary hover:bg-primaryHover text-white font-medium py-2.5 rounded-lg transition-colors flex justify-center items-center gap-2">
+                                {setupLoading ? 'Memproses...' : 'Simpan & Setup Database'}
+                            </button>
+                        </form>
+                            <div className="mt-6"><LanguageDropdown lang={lang} setLang={setLang} variant="light" /></div>
+
+                    </div>
+                </div>
+            );
+        };
+
+        // Login Screen Component
+        const LoginScreen = ({ config, setCurrentUser, setAppState, showToast, hashPassword, apiCall, lang, setLang, t }) => {
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [loginLoading, setLoginLoading] = useState(false);
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setLoginLoading(true);
+                try {
+                    const hash = hashPassword(password);
+                    const user = await apiCall(config, 'login', { username, passwordHash: hash });
+                    localStorage.setItem('currentUser', JSON.stringify(user));
+                    setCurrentUser(user);
+                    setAppState(user.role === 'Admin' || user.role === 'Tim IT' ? 'ADMIN_DASHBOARD' : 'USER_DASHBOARD');
+                    showToast(`Selamat datang, ${user.name}!`, 'success');
+                } catch (error) {
+                    showToast(error.message, 'error');
+                } finally {
+                    setLoginLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+                    {/* Decorative Background */}
+                    <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/20 rounded-full blur-3xl"></div>
+                    <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl"></div>
+
+                    <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl p-8 rounded-2xl shadow-2xl w-full max-w-md z-10 fade-in border border-slate-200/50 dark:border-slate-700/50">
+                        <div className="flex justify-center mb-6">
+                            <div className="w-16 h-16 bg-primary text-white rounded-2xl shadow-lg flex items-center justify-center">
+                                <Icon name="shield-check" size={32} />
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-center mb-1">Portal Helpdesk</h2>
+                        <p className="text-slate-500 text-center mb-8 text-sm">Masuk untuk melanjutkan</p>
+
+                        <form onSubmit={handleLogin} className="space-y-5">
+                            <div>
+                                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Username</label>
+                                <input required type="text" className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-900/50 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition" value={username} onChange={e => setUsername(e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Password</label>
+                                <input required type="password" className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-900/50 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition" value={password} onChange={e => setPassword(e.target.value)} />
+                            </div>
+                            <button type="submit" disabled={loginLoading} className="w-full bg-primary hover:bg-primaryHover shadow-lg shadow-primary/30 text-white font-medium py-3 rounded-xl transition-all active:scale-95 flex justify-center items-center gap-2">
+                                {loginLoading ? 'Memverifikasi...' : 'Login'}
+                            </button>
+                        </form>
+                        <div className="mt-6 text-center text-xs text-slate-400">
+                            Internal Bug Tracking System &copy; 2026
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Convert file to base64
+        
+
+        const LanguageDropdown = ({ lang, setLang, variant = 'light' }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const wrapperRef = useRef(null);
+            useEffect(() => {
+                function handleClickOutside(event) {
+                    if (wrapperRef.current && !wrapperRef.current.contains(event.target)) setIsOpen(false);
+                }
+                document.addEventListener("mousedown", handleClickOutside);
+                return () => document.removeEventListener("mousedown", handleClickOutside);
+            }, [wrapperRef]);
+            const options = [{value: 'ID', label: 'Indonesia'}, {value: 'MY', label: 'Malaysia'}, {value: 'EN', label: 'English'}];
+            
+            const btnClass = variant === 'dark' 
+                ? "w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-4 py-2 mt-1 rounded-lg text-sm text-slate-400 hover:bg-white/5 cursor-pointer transition"
+                : "w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-4 py-2 mt-1 rounded-lg text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition";
+
+            return (
+                <div ref={wrapperRef} className="relative w-full">
+                    <div onClick={() => setIsOpen(!isOpen)} className={btnClass}>
+                        <Icon name="globe" size={18} />
+                        <span className="hidden md:block flex-1 text-left">{options.find(o => o.value === lang)?.label}</span>
+                        <Icon name="chevron-down" size={14} className={`hidden md:block transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                    {isOpen && (
+                        <ul className="absolute z-50 bottom-full left-0 mb-2 w-full min-w-[150px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden py-1 fade-in">
+                            {options.map(opt => (
+                                <li 
+                                    key={opt.value}
+                                    className={`px-4 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 ${lang === opt.value ? 'text-primary font-bold bg-primary/5 dark:bg-primary/10' : 'text-slate-600 dark:text-slate-300'}`}
+                                    onClick={() => { setLang(opt.value); setIsOpen(false); }}
+                                >
+                                    {opt.label}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            );
+        };
+
+        const CustomDropdown = ({ options, value, onChange, label, disabled = false, className = "" }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const wrapperRef = useRef(null);
+
+            useEffect(() => {
+                function handleClickOutside(event) {
+                    if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+                        setIsOpen(false);
+                    }
+                }
+                document.addEventListener("mousedown", handleClickOutside);
+                return () => document.removeEventListener("mousedown", handleClickOutside);
+            }, [wrapperRef]);
+
+            return (
+                <div ref={wrapperRef} className={`relative ${className}`}>
+                    {label && <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{label}</label>}
+                    <div 
+                        className={`w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent flex justify-between items-center cursor-pointer transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary'} ${isOpen ? 'border-primary ring-2 ring-primary/20' : ''}`}
+                        onClick={() => !disabled && setIsOpen(!isOpen)}
+                    >
+                        <span className="truncate">{value || 'Pilih...'}</span>
+                        <Icon name="chevron-down" size={16} className={`transition-transform text-slate-400 ${isOpen ? 'rotate-180 text-primary' : ''}`} />
+                    </div>
+                    {isOpen && !disabled && (
+                        <ul className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto py-1 fade-in">
+                            {options.map((opt, i) => {
+                                const optValue = typeof opt === 'object' ? opt.value : opt;
+                                const optLabel = typeof opt === 'object' ? opt.label : opt;
+                                const isSelected = value === optValue;
+                                return (
+                                    <li 
+                                        key={i}
+                                        className={`px-4 py-2.5 cursor-pointer text-sm flex items-center justify-between transition-colors ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}`}
+                                        onClick={() => {
+                                            onChange(optValue);
+                                            setIsOpen(false);
+                                        }}
+                                    >
+                                        <span className="truncate">{optLabel}</span>
+                                        {isSelected && <Icon name="check" size={16} className="text-primary flex-shrink-0" />}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </div>
+            );
+        };
+
+const toBase64 = file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                let encoded = reader.result.toString().replace(/^data:(.*,)?/, '');
+                if ((encoded.length % 4) > 0) {
+                    encoded += '='.repeat(4 - (encoded.length % 4));
+                }
+                resolve(encoded);
+            };
+            reader.onerror = error => reject(error);
+        });
+
+        // Components for Dashboards
+        const TicketDetailModal = ({ ticket, onClose, currentUser, users = [], onUpdate, settings = { statuses: [], priorities: [] }, TICKET_STATUSES, showToast, lang, t }) => {
+            const [editForm, setEditForm] = useState({ status: '', priority: '', assignee: '', deadline: '' });
+            const [isSaving, setIsSaving] = useState(false);
+
+            useEffect(() => {
+                if (ticket) {
+                    setEditForm({
+                        status: ticket.status || 'Open',
+                        priority: ticket.priority || 'Medium',
+                        assignee: ticket.assignee || '',
+                        deadline: ticket.deadline ? ticket.deadline.split('T')[0] : ''
+                    });
+                }
+            }, [ticket]);
+
+            if (!ticket) return null;
+
+            const handleSave = async () => {
+                setIsSaving(true);
+                try {
+                    await onUpdate(ticket.id, editForm);
+                    onClose();
+                } catch (e) {
+                    if(showToast) showToast(e.message, 'error'); else alert(e.message);
+                } finally {
+                    setIsSaving(false);
+                }
+            };
+            const isVideo = ticket.attachment && ticket.attachment.match(/\.(mp4|webm|ogg)$/i);
+            const isImage = ticket.attachment && ticket.attachment.match(/\.(jpeg|jpg|gif|png)$/i);
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col">
+                        <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-xl font-bold">{ticket.id}</h3>
+                                    <button onClick={() => { navigator.clipboard.writeText(ticket.id); if(showToast) showToast('ID Tiket disalin!', 'success'); else alert('ID Tiket disalin!'); }} className="text-slate-400 hover:text-primary transition" title="Copy ID">
+                                        <Icon name="copy" size={16} />
+                                    </button>
+                                </div>
+                                {currentUser?.role === 'Admin' || currentUser?.role === 'Tim IT' ? (
+                                    <CustomDropdown
+                                        className="mt-1 w-48"
+                                        options={settings.statuses}
+                                        value={editForm.status}
+                                        onChange={val => setEditForm({ ...editForm, status: val })}
+                                    />
+                                ) : (
+                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium mt-1 ${ticket.status === 'Open' ? 'bg-indigo-100 text-indigo-700' : ticket.status === 'Done' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                        {ticket.status}
+                                    </span>
+                                )}
+                            </div>
+                            <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition"><Icon name="x" /></button>
+                        </div>
+                        <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
+                            <div className="lg:col-span-2 space-y-6">
+                                <div>
+                                    <h4 className="text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wider">Masalah</h4>
+                                    <p className="text-lg font-medium">{ticket.problem}</p>
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wider">Detail Lengkap</h4>
+                                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl text-sm whitespace-pre-wrap">
+                                        {ticket.detail}
+                                    </div>
+                                </div>
+
+                                {ticket.attachment && (
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-slate-500 mb-2 uppercase tracking-wider">Lampiran</h4>
+                                        <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-2 bg-slate-50 dark:bg-slate-900/50 overflow-hidden flex justify-center">
+                                            {isImage ? (
+                                                <img src={ticket.attachment} alt="Lampiran" className="max-h-64 object-contain rounded-lg" />
+                                            ) : isVideo ? (
+                                                <video src={ticket.attachment} controls className="max-h-64 rounded-lg bg-black w-full" preload="metadata" />
+                                            ) : (
+                                                <a href={ticket.attachment} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-primary hover:underline p-4">
+                                                    <Icon name="paperclip" /> Lihat Lampiran
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-6 lg:border-l border-slate-200 dark:border-slate-700 lg:pl-6">
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-slate-500 block mb-1">Reporter</span>
+                                        <span className="font-medium">{ticket.reporter}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-500 block mb-1">Aplikasi</span>
+                                        <span className="font-medium">{ticket.app}</span>
+                                    </div>
+
+                                    {currentUser?.role === 'Admin' || currentUser?.role === 'Tim IT' ? (
+                                        <>
+                                            <div className="col-span-2">
+                                                <label className="text-slate-500 block mb-1">Priority</label>
+                                                <CustomDropdown
+                                                    options={settings.priorities}
+                                                    value={editForm.priority}
+                                                    onChange={val => setEditForm({ ...editForm, priority: val })}
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <label className="text-slate-500 block mb-1">Assignee (Tim)</label>
+                                                <CustomDropdown
+                                                    options={[{label: '-- Belum ada Assignee --', value: ''}, ...users.filter(u => u.role === 'Tim IT' || u.role === 'Admin').map(u => ({label: u.name, value: u.name}))]}
+                                                    value={editForm.assignee}
+                                                    onChange={val => setEditForm({ ...editForm, assignee: val })}
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <label className="text-slate-500 block mb-1">Deadline</label>
+                                                <input type="date" className="w-full px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent outline-none" value={editForm.deadline} onChange={e => setEditForm({ ...editForm, deadline: e.target.value })} />
+                                            </div>
+                                            <div className="col-span-2 pt-2">
+                                                <button onClick={handleSave} disabled={isSaving} className="w-full bg-primary hover:bg-primaryHover text-white py-2 rounded-lg font-medium transition flex items-center justify-center gap-2">
+                                                    {isSaving ? 'Menyimpan...' : <><Icon name="check" size={16} /> {t(lang, 'updateTicket')}</>}
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <span className="text-slate-500 block mb-1">Priority</span>
+                                                <span className={`font-medium ${ticket.priority === 'Critical' ? 'text-red-500' : ticket.priority === 'High' ? 'text-amber-500' : ''}`}>{ticket.priority}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-500 block mb-1">Assignee</span>
+                                                <span className="font-medium">{ticket.assignee || '-'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-500 block mb-1">Deadline</span>
+                                                <span className="font-medium">{ticket.deadline ? new Date(ticket.deadline).toLocaleDateString('id-ID') : '-'}</span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="col-span-2">
+                                        <span className="text-slate-500 block mb-1">{t(lang, 'dateEntered')}</span>
+                                        <span className="font-medium">{new Date(ticket.date).toLocaleDateString('id-ID')}</span>
+                                    </div>
+                                </div>
+
+                                <hr className="border-slate-200 dark:border-slate-700" />
+
+                                <div>
+                                    <h4 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider flex items-center gap-2"><Icon name="clock" size={16} /> Timeline</h4>
+                                    <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+                                        {ticket.timeline && ticket.timeline.length > 0 ? ticket.timeline.map((tl, i) => (
+                                            <div key={i} className="flex gap-3 text-sm">
+                                                <div className="flex flex-col items-center">
+                                                    <div className="w-2.5 h-2.5 bg-primary rounded-full mt-1.5"></div>
+                                                    {i !== ticket.timeline.length - 1 && <div className="w-0.5 h-full bg-slate-200 dark:bg-slate-700 my-1"></div>}
+                                                </div>
+                                                <div className="pb-3">
+                                                    <p className="font-medium">{tl.activity}</p>
+                                                    <p className="text-xs text-slate-500">{new Date(tl.date).toLocaleString('id-ID')} oleh {tl.by}</p>
+                                                    {tl.notes && <p className="text-xs mt-1 bg-slate-100 dark:bg-slate-800 p-1.5 rounded text-slate-600 dark:text-slate-400">{tl.notes}</p>}
+                                                </div>
+                                            </div>
+                                        )) : <p className="text-sm text-slate-500">Belum ada aktivitas.</p>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // USER DASHBOARD
+        const UserDashboard = ({ config, currentUser, users, tickets, setTickets, settings, loadData, showToast, isDarkMode, setIsDarkMode, handleLogout, apiCall, PRIORITIES, lang, setLang, t }) => {
+            const [view, setView] = useState('HISTORY'); // FORM, HISTORY, TRACK
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [form, setForm] = useState({ app: '', priority: 'Medium', problem: '', detail: '' });
+            const [file, setFile] = useState(null);
+
+            const [search, setSearch] = useState('');
+            const [selectedTicket, setSelectedTicket] = useState(null);
+
+            const myTickets = tickets.filter(t => t.reporter === currentUser.name);
+            const notifTickets = myTickets.filter(t => t.status !== 'Open' && t.status !== 'Done');
+            const [isNotifOpen, setIsNotifOpen] = useState(false);
+            const notifRef = useRef(null);
+
+            useEffect(() => {
+                function handleClickOutside(event) {
+                    if (notifRef.current && !notifRef.current.contains(event.target)) {
+                        setIsNotifOpen(false);
+                    }
+                }
+                document.addEventListener("mousedown", handleClickOutside);
+                return () => document.removeEventListener("mousedown", handleClickOutside);
+            }, [notifRef]);
+            const hasAutoNavigated = useRef(false);
+
+            useEffect(() => {
+                if (tickets.length > 0 && !hasAutoNavigated.current) {
+                    if (myTickets.length > 0) {
+                        setView('HISTORY');
+                    }
+                    hasAutoNavigated.current = true;
+                }
+            }, [tickets]);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!form.app) {
+                    showToast('Silakan pilih Aplikasi!', 'error');
+                    return;
+                }
+                setIsSubmitting(true);
+                try {
+                    let attachmentUrl = '';
+                    if (file) {
+                        const base64 = await toBase64(file);
+                        const uploadRes = await apiCall(config, 'uploadFile', {
+                            base64, filename: file.name, mimeType: file.type
+                        });
+                        attachmentUrl = uploadRes.url || uploadRes.downloadUrl;
+                    }
+
+                    const newTicket = {
+                        reporter: currentUser.name,
+                        app: form.app,
+                        priority: form.priority,
+                        problem: form.problem,
+                        detail: form.detail,
+                        attachment: attachmentUrl
+                    };
+
+                    await apiCall(config, 'saveTicket', { ticket: newTicket, user: currentUser });
+                    showToast('Tiket berhasil dibuat!', 'success');
+                    setForm({ app: '', priority: 'Medium', problem: '', detail: '' });
+                    setFile(null);
+                    loadData();
+                    setView('HISTORY');
+                } catch (error) {
+                    showToast(error.message, 'error');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    {/* Sidebar */}
+                    <aside className="w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col">
+                        <div className="h-16 flex items-center px-6 border-b border-slate-200 dark:border-slate-700">
+                            <Icon name="shield-check" className="text-primary mr-2" size={24} />
+                            <span className="font-bold text-lg">{t(lang, "userPortal")}</span>
+                        </div>
+                        <div className="p-4 flex-1 space-y-1">
+                            <button onClick={() => setView('HISTORY')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition ${view === 'HISTORY' ? 'bg-indigo-50 text-primary dark:bg-indigo-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                                <Icon name="layout-dashboard" size={18} /> {t(lang, 'history')}
+                            </button>
+                            <button onClick={() => setView('FORM')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition ${view === 'FORM' ? 'bg-indigo-50 text-primary dark:bg-indigo-900/30' : 'hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                                <Icon name="plus" size={18} /> {t(lang, 'createTicket')}
+                            </button>
+                        </div>
+                        <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">{currentUser.name.charAt(0)}</div>
+                                <div className="text-sm font-medium truncate">{currentUser.name}</div>
+                            </div>
+                            
+<LanguageDropdown lang={lang} setLang={setLang} variant="light" />
+                            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                                <Icon name="log-out" size={18} /> Keluar
+                            </button>
+                            <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center gap-3 px-4 py-2 mt-1 rounded-lg text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                                {isDarkMode ? <><Icon name="sun" size={18} /> Terang</> : <><Icon name="moon" size={18} /> Gelap</>}
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* Content */}
+                    <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
+                        {/* Header */}
+                        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 shrink-0 z-10">
+                            <h1 className="text-xl font-bold hidden sm:block">{view === 'HISTORY' ? t(lang, 'history') : t(lang, 'createTicket')}</h1>
+                            <div className="flex items-center gap-4 w-full sm:w-auto justify-end">
+                                {view === 'HISTORY' && (
+                                    <div className="relative flex-1 sm:w-64">
+                                        <Icon name="search" size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                                        <input type="text" placeholder={t(lang, 'searchTickets')} className="w-full pl-9 pr-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary text-sm" value={search} onChange={e => setSearch(e.target.value)} />
+                                    </div>
+                                )}
+                                <div ref={notifRef} className="relative shrink-0">
+                                    <div onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative flex items-center justify-center p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition" title={`${notifTickets.length} Notifikasi`}>
+                                        <Icon name="bell" size={20} className="text-slate-600 dark:text-slate-300" />
+                                        {notifTickets.length > 0 && (
+                                            <span className="absolute top-1 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white dark:border-slate-800 rounded-full animate-pulse"></span>
+                                        )}
+                                    </div>
+                                    {isNotifOpen && (
+                                        <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 fade-in">
+                                            <div className="p-3 border-b border-slate-100 dark:border-slate-700 font-bold">{t(lang, 'newNotif')}</div>
+                                            <div className="max-h-64 overflow-y-auto">
+                                                {notifTickets.length > 0 ? (
+                                                    notifTickets.map(t => (
+                                                        <div key={t.id} onClick={() => { setSelectedTicket(t); setIsNotifOpen(false); }} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-100 dark:border-slate-700/50 transition">
+                                                            <div className="text-sm font-bold text-primary mb-1">{t.id}</div>
+                                                            <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-1 mb-1">Status update: {t.status}</div>
+                                                            <div className="text-[10px] text-slate-400">{new Date(t.date).toLocaleDateString('id-ID')}</div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-4 text-center text-sm text-slate-500">{t(lang, 'noNewTickets')}</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+                            <div className="max-w-4xl mx-auto">
+                                {view === 'FORM' && (
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-8 fade-in">
+                                    <h2 className="text-2xl font-bold mb-6">{t(lang, 'createNew')}</h2>
+                                    <form onSubmit={handleSubmit} className="space-y-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-sm font-medium mb-1">{t(lang, 'appModule')}</label>
+                                                <select required className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={form.app} onChange={e => setForm({ ...form, app: e.target.value })}>
+                                                    <option value="" disabled>{t(lang, 'selectApp')}</option>
+                                                    {settings.apps.map(a => <option key={a} value={a}>{a}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium mb-1">{t(lang, 'catPriority')}</label>
+                                                <select className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
+                                                    {settings.priorities.map(p => <option key={p} value={p}>{p}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Ringkasan Masalah</label>
+                                            <input required type="text" className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={form.problem} onChange={e => setForm({ ...form, problem: e.target.value })} placeholder="Singkat dan jelas" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Detail Lengkap</label>
+                                            <textarea required rows="5" className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={form.detail} onChange={e => setForm({ ...form, detail: e.target.value })} placeholder="Jelaskan langkah-langkah, ekspektasi, dan hasil aktual..."></textarea>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">{t(lang, 'attachment')}</label>
+                                            <input type="file" accept="image/*,video/*" onChange={e => setFile(e.target.files[0])} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-primary hover:file:bg-indigo-100 transition cursor-pointer" />
+                                        </div>
+                                        <div className="pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+                                            <button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primaryHover text-white px-6 py-2.5 rounded-xl font-medium shadow-md shadow-primary/20 transition-all flex items-center gap-2">
+                                                {isSubmitting ? 'Mengirim...' : <><Icon name="check" size={18} /> {t(lang, 'submitTicket')}</>}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
+
+                            {view === 'HISTORY' && (
+                                <div className="fade-in space-y-6">
+                                    <div className="flex justify-between items-center">
+                                        <h2 className="text-2xl font-bold">{t(lang, 'history')} Saya</h2>
+                                        <button onClick={() => setView('FORM')} className="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm">
+                                            <Icon name="plus" size={16} /> {t(lang, 'createNew')}
+                                        </button>
+                                    </div>
+                                    {myTickets.length === 0 ? (
+                                        <div className="text-center p-12 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                            <Icon name="file-text" size={48} className="mx-auto text-slate-300 mb-4" />
+                                            <p className="text-slate-500 mb-4">{t(lang, 'noTickets')}</p>
+                                            <button onClick={() => setView('FORM')} className="bg-primary/10 text-primary hover:bg-primary hover:text-white px-6 py-2.5 rounded-xl font-medium transition mx-auto inline-flex items-center gap-2">
+                                                {t(lang, 'createNow')}
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-4">
+                                            {myTickets.filter(t => t.id.toLowerCase().includes(search.toLowerCase()) || t.problem.toLowerCase().includes(search.toLowerCase()) || t.app.toLowerCase().includes(search.toLowerCase())).map(t => (
+                                                <div key={t.id} onClick={() => setSelectedTicket(t)} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="font-bold text-primary">{t.id}</span>
+                                                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700">{t.app}</span>
+                                                        </div>
+                                                        <h3 className="font-medium text-lg mb-1 line-clamp-1">{t.problem}</h3>
+                                                        <div className="text-sm text-slate-500 flex flex-wrap gap-4 mt-2">
+                                                            <div className="flex items-center gap-1"><Icon name="clock" size={14} /> {new Date(t.date).toLocaleDateString('id-ID')}</div>
+                                                            <div className="flex items-center gap-1"><Icon name="shield-check" size={14} /> Prioritas: {t.priority}</div>
+                                                            {t.assignee && <div className="flex items-center gap-1 text-primary"><Icon name="users" size={14} /> Assignee: {t.assignee}</div>}
+                                                            {t.deadline && <div className="flex items-center gap-1"><Icon name="clock" size={14} /> Deadline: {new Date(t.deadline).toLocaleDateString('id-ID')}</div>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="shrink-0 flex flex-row md:flex-col items-center md:items-end gap-2">
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${t.status === 'Open' ? 'bg-indigo-100 text-indigo-700' : t.status === 'Done' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                            {t.status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        </div>
+                    </main>
+                    <TicketDetailModal
+                        ticket={selectedTicket}
+                        onClose={() => setSelectedTicket(null)}
+                        currentUser={currentUser}
+                        users={users}
+                        settings={settings}
+                        showToast={showToast} lang={lang} setLang={setLang} t={t}
+                        onUpdate={async (ticketId, updateData) => {
+                            const payload = {
+                                ticket: { id: ticketId, ...updateData },
+                                user: currentUser
+                            };
+                            const updated = await apiCall(config, 'saveTicket', payload);
+                            setTickets(tickets.map(x => x.id === ticketId ? updated : x));
+                            showToast('Tiket berhasil diupdate!');
+                        }}
+                    />
+                </div>
+            );
+        };
+
+        // ADMIN DASHBOARD
+        const AdminDashboard = ({ config, currentUser, users, tickets, setTickets, settings, setSettings, loadData, showToast, isDarkMode, setIsDarkMode, handleLogout, apiCall, TICKET_STATUSES, hashPassword, lang, setLang, t }) => {
+            const [view, setView] = useState('BOARD'); // BOARD, USERS
+            const [search, setSearch] = useState('');
+            const [selectedTicket, setSelectedTicket] = useState(null);
+
+            // User management
+            const [userModalOpen, setUserModalOpen] = useState(false);
+            const [userForm, setUserForm] = useState({ id: null, name: '', username: '', password: '', role: 'User', status: 'Active' });
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            
+            // Notification
+            const [isNotifOpen, setIsNotifOpen] = useState(false);
+            const notifRef = useRef(null);
+
+            useEffect(() => {
+                function handleClickOutside(event) {
+                    if (notifRef.current && !notifRef.current.contains(event.target)) {
+                        setIsNotifOpen(false);
+                    }
+                }
+                document.addEventListener("mousedown", handleClickOutside);
+                return () => document.removeEventListener("mousedown", handleClickOutside);
+            }, [notifRef]);
+
+            // Kanban drag drop
+            const handleDragStart = (e, id) => { e.dataTransfer.setData('ticketId', id); };
+            const handleDragOver = (e) => { e.preventDefault(); };
+            const handleDrop = async (e, status) => {
+                e.preventDefault();
+                const tId = e.dataTransfer.getData('ticketId');
+                const t = tickets.find(x => x.id === tId);
+                if (t && t.status !== status) {
+                    try {
+                        const updated = await apiCall(config, 'saveTicket', { ticket: { id: tId, status: status }, user: currentUser });
+                        setTickets(tickets.map(x => x.id === tId ? updated : x));
+                        showToast('Status diperbarui!');
+                    } catch (err) {
+                        showToast(err.message, 'error');
+                    }
+                }
+            };
+
+            const handleSaveUser = async (e) => {
+                e.preventDefault();
+                setIsSubmitting(true);
+                try {
+                    const data = { ...userForm };
+                    if (data.password) data.password = hashPassword(data.password);
+                    await apiCall(config, 'saveUser', { user: data });
+                    showToast('Pengguna disimpan!', 'success');
+                    setUserModalOpen(false);
+                    loadData();
+                } catch (error) {
+                    showToast(error.message, 'error');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+
+            const roleFilteredTickets = currentUser.role === 'Tim IT' ? tickets.filter(t => t.assignee === currentUser.name) : tickets;
+            const filteredTickets = roleFilteredTickets.filter(t => (t.id || '').toLowerCase().includes(search.toLowerCase()) || (t.problem || '').toLowerCase().includes(search.toLowerCase()) || (t.app || '').toLowerCase().includes(search.toLowerCase()));
+            const notifTickets = roleFilteredTickets.filter(t => t.status === 'Open');
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    {/* Sidebar */}
+                    <aside className="w-16 md:w-64 bg-darkBg text-white flex flex-col transition-all duration-300 z-20">
+                        <div className="h-16 flex items-center justify-center md:justify-start md:px-6 border-b border-white/10">
+                            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0 shadow-lg shadow-primary/50 text-white">
+                                <Icon name="shield-check" size={20} />
+                            </div>
+                            <span className="font-bold text-lg ml-3 hidden md:block">{t(lang, "adminPortal")}</span>
+                        </div>
+                        <nav className="flex-1 py-4 space-y-1 px-2 md:px-4">
+                            <button onClick={() => setView('BOARD')} className={`w-full flex items-center gap-3 px-2 md:px-4 py-3 rounded-xl transition ${view === 'BOARD' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                                <Icon name="layout-dashboard" size={20} />
+                                <span className="font-medium hidden md:block">{t(lang, "kanbanBoard")}</span>
+                            </button>
+                            {currentUser.role === 'Admin' && (
+                                <>
+                                    <button onClick={() => setView('USERS')} className={`w-full flex items-center gap-3 px-2 md:px-4 py-3 rounded-xl transition ${view === 'USERS' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                                        <Icon name="users" size={20} />
+                                        <span className="font-medium hidden md:block">{t(lang, "manageUsers")}</span>
+                                    </button>
+                                    <button onClick={() => setView('SETTINGS')} className={`w-full flex items-center gap-3 px-2 md:px-4 py-3 rounded-xl transition ${view === 'SETTINGS' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                                        <Icon name="settings" size={20} />
+                                        <span className="font-medium hidden md:block">{t(lang, "settings")}</span>
+                                    </button>
+                                </>
+                            )}
+                        </nav>
+                        <div className="p-4 border-t border-white/10">
+                            <div className="flex items-center gap-3 md:mb-4 justify-center md:justify-start">
+                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-xs shrink-0">{currentUser.name.charAt(0)}</div>
+                                <div className="hidden md:block text-sm font-medium truncate">{currentUser.name}</div>
+                            </div>
+                            <LanguageDropdown lang={lang} setLang={setLang} variant="dark" />
+                            <button onClick={handleLogout} className="w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-4 py-2 mt-2 md:mt-0 rounded-lg text-sm text-red-400 hover:bg-red-500/10 transition">
+                                <Icon name="log-out" size={18} /> <span className="hidden md:block">{t(lang, 'logout')}</span>
+                            </button>
+                            <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-4 py-2 mt-1 rounded-lg text-sm text-slate-400 hover:bg-white/5 transition">
+                                {isDarkMode ? <Icon name="sun" size={18} /> : <Icon name="moon" size={18} />}
+                                <span className="hidden md:block">{isDarkMode ? t(lang, 'light') : t(lang, 'dark')}</span>
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* Content */}
+                    <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
+                        {/* Header */}
+                        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 shrink-0 z-10">
+                            <h1 className="text-xl font-bold hidden sm:block">{view === 'BOARD' ? t(lang, 'kanbanBoard') : view === 'USERS' ? t(lang, 'manageUsers') : t(lang, 'sysSettings')}</h1>
+                            <div className="flex items-center gap-4 w-full sm:w-auto justify-end">
+                                {view === 'BOARD' && (
+                                    <div className="relative flex-1 sm:w-64">
+                                        <Icon name="search" size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                                        <input type="text" placeholder={t(lang, 'searchTickets')} className="w-full pl-9 pr-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-primary text-sm" value={search} onChange={e => setSearch(e.target.value)} />
+                                    </div>
+                                )}
+                                {view === 'USERS' && (
+                                    <button onClick={() => { setUserForm({ id: null, name: '', username: '', password: '', role: 'User', status: 'Active' }); setUserModalOpen(true); }} className="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm shrink-0">
+                                        <Icon name="plus" size={16} /> {t(lang, 'addUser')}
+                                    </button>
+                                )}
+                                <div ref={notifRef} className="relative shrink-0">
+                                    <div onClick={() => setIsNotifOpen(!isNotifOpen)} className="relative flex items-center justify-center p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition" title={`${notifTickets.length} Tiket Baru (Open)`}>
+                                        <Icon name="bell" size={20} className="text-slate-600 dark:text-slate-300" />
+                                        {notifTickets.length > 0 && (
+                                            <span className="absolute top-1 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white dark:border-slate-800 rounded-full animate-pulse"></span>
+                                        )}
+                                    </div>
+                                    {isNotifOpen && (
+                                        <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 fade-in">
+                                            <div className="p-3 border-b border-slate-100 dark:border-slate-700 font-bold">{t(lang, 'newNotif')}</div>
+                                            <div className="max-h-64 overflow-y-auto">
+                                                {notifTickets.length > 0 ? (
+                                                    notifTickets.map(t => (
+                                                        <div key={t.id} onClick={() => { setSelectedTicket(t); setIsNotifOpen(false); }} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-100 dark:border-slate-700/50 transition">
+                                                            <div className="text-sm font-bold text-primary mb-1">{t.id}</div>
+                                                            <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-1 mb-1">{t.problem}</div>
+                                                            <div className="text-[10px] text-slate-400">{new Date(t.date).toLocaleDateString('id-ID')}</div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-4 text-center text-sm text-slate-500">{t(lang, 'noNewTickets')}</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="flex-1 overflow-auto p-6">
+                            {view === 'BOARD' && (
+                                <div className="flex gap-6 h-full items-start overflow-x-auto pb-4 fade-in">
+                                    {settings.statuses.map(status => (
+                                        <div key={status} className="w-80 shrink-0 bg-slate-100/50 dark:bg-slate-800/50 rounded-2xl p-4 flex flex-col max-h-full border border-slate-200 dark:border-slate-700" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, status)}>
+                                            <div className="flex justify-between items-center mb-4 px-1">
+                                                <h3 className="font-bold text-sm uppercase tracking-wider text-slate-500">{status}</h3>
+                                                <span className="bg-slate-200 dark:bg-slate-700 text-xs font-bold px-2 py-0.5 rounded-full">{filteredTickets.filter(t => t.status === status).length}</span>
+                                            </div>
+                                            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                                                {filteredTickets.filter(t => t.status === status).map(t => (
+                                                    <div key={t.id} draggable onDragStart={(e) => handleDragStart(e, t.id)} onClick={() => setSelectedTicket(t)} className="bg-white dark:bg-slate-700 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:shadow-md transition group">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <span className="text-xs font-bold text-primary">{t.id}</span>
+                                                            {t.attachment && <Icon name="paperclip" size={14} className="text-slate-400" />}
+                                                        </div>
+                                                        <p className="font-medium text-sm mb-3 line-clamp-2">{t.problem}</p>
+                                                        <div className="flex justify-between items-center text-xs text-slate-500 mb-2">
+                                                            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">{t.app}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center">
+                                                            {t.assignee ? (
+                                                                <div className="flex items-center gap-1 text-xs text-primary">
+                                                                    <Icon name="users" size={14} /> <span>{t.assignee}</span>
+                                                                </div>
+                                                            ) : <div />}
+                                                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                                                                <div className={`w-2 h-2 rounded-full ${t.priority === 'Critical' ? 'bg-red-500' : t.priority === 'High' ? 'bg-amber-500' : 'bg-blue-400'}`}></div>
+                                                                <span>{t.priority}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {view === 'USERS' && (
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden fade-in">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-xs uppercase tracking-wider text-slate-500">
+                                                <th className="p-4 font-semibold">Nama</th>
+                                                <th className="p-4 font-semibold">Username</th>
+                                                <th className="p-4 font-semibold">Role</th>
+                                                <th className="p-4 font-semibold">Status</th>
+                                                <th className="p-4 font-semibold">Last Login</th>
+                                                <th className="p-4 font-semibold text-right">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                            {users.map(u => (
+                                                <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                                                    <td className="p-4 font-medium">{u.name}</td>
+                                                    <td className="p-4 text-slate-500">{u.username}</td>
+                                                    <td className="p-4">
+                                                        <span className={`px-2 py-1 rounded text-xs font-medium ${u.role === 'Admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}`}>{u.role}</span>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className={`flex items-center gap-1.5 text-xs font-medium ${u.status === 'Active' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                                                            <div className={`w-1.5 h-1.5 rounded-full ${u.status === 'Active' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                                                            {u.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-sm text-slate-500">{u.lastLogin ? new Date(u.lastLogin).toLocaleDateString('id-ID') : '-'}</td>
+                                                    <td className="p-4 text-right space-x-2">
+                                                        <button onClick={() => { setUserForm({ ...u, password: '' }); setUserModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-primary hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded"><Icon name="edit" size={16} /></button>
+                                                        {u.username !== 'admin' && (
+                                                            <button onClick={async () => {
+                                                                if (confirm('Hapus user ini?')) {
+                                                                    try { await apiCall(config, 'deleteUser', { userId: u.id }); loadData(); showToast('Terhapus'); }
+                                                                    catch (e) { showToast(e.message, 'error'); }
+                                                                }
+                                                            }} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"><Icon name="trash" size={16} /></button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            {view === 'SETTINGS' && (
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 fade-in space-y-10">
+                                    <div className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-300 p-4 rounded-xl text-sm flex items-start gap-3">
+                                        <Icon name="info" className="shrink-0 mt-0.5" size={18} />
+                                        <p>Data di bawah ini digunakan untuk mengatur opsi Dropdown (Pilihan) pada form pembuatan dan pengeditan tiket. Tekan <strong>Enter</strong> pada kolom input untuk menambahkan opsi baru.</p>
+                                    </div>
+                                    {['apps', 'priorities', 'statuses'].map(key => (
+                                        <div key={key}>
+                                            <h3 className="text-lg font-bold mb-1">{key === 'apps' ? `Daftar ${t(lang, 'appModule')}` : key === 'priorities' ? `Daftar ${t(lang, 'catPriority')}` : 'Daftar Status Tiket'}</h3>
+                                            <p className="text-sm text-slate-500 mb-4">Kelola opsi yang akan muncul di dropdown {key === 'apps' ? 'Aplikasi' : key === 'priorities' ? 'Kategori/Prioritas' : 'Status'}.</p>
+
+                                            <div className="flex flex-wrap gap-2 mb-4">
+                                                {settings[key]?.map((item, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm">
+                                                        <span>{item}</span>
+                                                        <button onClick={async () => {
+                                                            if (confirm(`Hapus "${item}" dari daftar?`)) {
+                                                                const newArr = settings[key].filter((_, i) => i !== idx);
+                                                                const newSet = { ...settings, [key]: newArr };
+                                                                try {
+                                                                    await apiCall(config, 'saveSettings', { settings: newSet });
+                                                                    setSettings(newSet);
+                                                                    showToast('Item berhasil dihapus');
+                                                                } catch (e) { showToast(e.message, 'error'); }
+                                                            }
+                                                        }} className="text-slate-400 hover:text-red-500 transition ml-1"><Icon name="x" size={14} /></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex gap-2 max-w-sm">
+                                                <input type="text" placeholder="Ketik nama opsi baru, lalu tekan Enter..." className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none text-sm transition" onKeyDown={async (e) => {
+                                                    if (e.key === 'Enter' && e.target.value.trim() !== '') {
+                                                        const val = e.target.value.trim();
+                                                        if (settings[key]?.includes(val)) return showToast('Opsi sudah ada!', 'error');
+                                                        const newSet = { ...settings, [key]: [...(settings[key] || []), val] };
+                                                        try {
+                                                            await apiCall(config, 'saveSettings', { settings: newSet });
+                                                            setSettings(newSet);
+                                                            e.target.value = '';
+                                                            showToast('Opsi berhasil ditambahkan');
+                                                        } catch (err) { showToast(err.message, 'error'); }
+                                                    }
+                                                }} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </main>
+
+                    {/* Modals */}
+                    <TicketDetailModal
+                        ticket={selectedTicket}
+                        onClose={() => setSelectedTicket(null)}
+                        currentUser={currentUser}
+                        users={users}
+                        settings={settings}
+                        showToast={showToast} lang={lang} setLang={setLang} t={t}
+                        onUpdate={async (ticketId, updateData) => {
+                            const payload = {
+                                ticket: { id: ticketId, ...updateData },
+                                user: currentUser
+                            };
+                            const updated = await apiCall(config, 'saveTicket', payload);
+                            setTickets(tickets.map(x => x.id === ticketId ? updated : x));
+                            showToast('Tiket berhasil diupdate!');
+                        }}
+                    />
+
+                    {userModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 fade-in">
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md">
+                                <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-slate-700">
+                                    <h3 className="text-xl font-bold">{userForm.id ? 'Edit User' : t(lang, 'addUser')}</h3>
+                                    <button onClick={() => setUserModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition"><Icon name="x" /></button>
+                                </div>
+                                <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Nama Lengkap</label>
+                                        <input required type="text" className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={userForm.name} onChange={e => setUserForm({ ...userForm, name: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Username</label>
+                                        <input required type="text" className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={userForm.username} onChange={e => setUserForm({ ...userForm, username: e.target.value })} disabled={userForm.username === 'admin'} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">{userForm.id ? 'Password Baru (Kosongkan jika tidak diubah)' : 'Password'}</label>
+                                        <input required={!userForm.id} type="password" className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Role</label>
+                                            <select className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={userForm.role} onChange={e => setUserForm({ ...userForm, role: e.target.value })} disabled={userForm.username === 'admin'}>
+                                                <option value="User">User</option>
+                                                <option value="Tim IT">Tim IT</option>
+                                                <option value="Admin">Admin</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Status</label>
+                                            <select className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={userForm.status} onChange={e => setUserForm({ ...userForm, status: e.target.value })} disabled={userForm.username === 'admin'}>
+                                                <option value="Active">Active</option>
+                                                <option value="Inactive">Inactive</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="pt-4 flex justify-end">
+                                        <button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primaryHover text-white px-6 py-2.5 rounded-xl font-medium shadow-sm transition-all flex items-center gap-2">
+                                            {isSubmitting ? 'Menyimpan...' : 'Simpan'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+
+
+        function App() {
+            // Theme State
+            const [isDarkMode, setIsDarkMode] = useState(() => {
+                const saved = localStorage.getItem('theme');
+                if (saved) return saved === 'dark';
+                return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            });
+
+            useEffect(() => {
+                localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+                if (isDarkMode) document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [isDarkMode]);
+
+            // App States
+            const [appState, setAppState] = useState('LOADING'); // LOADING, SETUP, LOGIN, ADMIN_DASHBOARD, USER_DASHBOARD
+            const [config, setConfig] = useState({ api: '', sheetId: '', folderId: '' });
+            const [currentUser, setCurrentUser] = useState(null);
+            const [lang, setLang] = useState('MY');
+            const [users, setUsers] = useState([]);
+            const [tickets, setTickets] = useState([]);
+            const [settings, setSettings] = useState({ apps: [], priorities: [], statuses: [] });
+            const [isLoading, setIsLoading] = useState(false);
+            const [toast, setToast] = useState(null);
+
+            const showToast = (message, type = 'success') => {
+                setToast({ message, type, id: Date.now() });
+                setTimeout(() => setToast(null), 3000);
+            };
+
+            // Init from URL or LocalStorage
+            useEffect(() => {
+                const params = new URLSearchParams(window.location.search);
+                const pApi = params.get('api');
+                const pSheet = params.get('sheetId');
+                const pFolder = params.get('folderId');
+
+                const savedConfig = JSON.parse(localStorage.getItem('appConfig') || '{}');
+
+                let finalConfig = {
+                    api: HARDCODED_API_URL || pApi || savedConfig.api || '',
+                    sheetId: DEFAULT_SHEET_ID || pSheet || savedConfig.sheetId || '',
+                    folderId: DEFAULT_FOLDER_ID || pFolder || savedConfig.folderId || ''
+                };
+
+                setConfig(finalConfig);
+
+                if (finalConfig.api && finalConfig.sheetId && finalConfig.folderId) {
+                    localStorage.setItem('appConfig', JSON.stringify(finalConfig));
+
+                    const savedUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+                    if (savedUser) {
+                        setCurrentUser(savedUser);
+                        setAppState(savedUser.role === 'Admin' || savedUser.role === 'Tim IT' ? 'ADMIN_DASHBOARD' : 'USER_DASHBOARD');
+                    } else {
+                        setAppState('LOGIN');
+                    }
+                } else {
+                    setAppState('SETUP');
+                }
+            }, []);
+
+            const handleLogout = () => {
+                localStorage.removeItem('currentUser');
+                setCurrentUser(null);
+                setAppState('LOGIN');
+                showToast("Berhasil logout", "success");
+            };
+
+            const loadData = async () => {
+                setIsLoading(true);
+                try {
+                    const settingsData = await apiCall(config, 'getSettings');
+                    setSettings(settingsData);
+
+                    if (currentUser.role === 'Admin' || currentUser.role === 'Tim IT') {
+                        const usersData = await apiCall(config, 'getUsers');
+                        setUsers(usersData);
+                    }
+                    const ticketsData = await apiCall(config, 'getTickets');
+                    setTickets(ticketsData);
+                } catch (error) {
+                    showToast(error.message, 'error');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            useEffect(() => {
+                let interval;
+                if (appState === 'ADMIN_DASHBOARD' || appState === 'USER_DASHBOARD') {
+                    loadData();
+                    // Auto-refresh tickets every 15 seconds
+                    interval = setInterval(() => {
+                        apiCall(config, 'getTickets').then(data => {
+                            setTickets(data);
+                        }).catch(e => console.log('Auto-refresh silent err', e));
+                    }, 15000);
+                }
+                return () => { if (interval) clearInterval(interval); };
+            }, [appState]);
+
+            // TOAST RENDERER
+            const renderToast = () => {
+                if (!toast) return null;
+                return (
+                    <div className="fixed bottom-6 right-6 z-50 fade-in">
+                        <div className={`px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'}`}>
+                            {toast.type === 'error' ? <div className="w-2 h-2 rounded-full bg-red-500"></div> : <div className="w-2 h-2 rounded-full bg-emerald-500"></div>}
+                            <span className="font-medium text-sm">{toast.message}</span>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Loading state overlay
+            if (isLoading && !currentUser) {
+                return <div className="h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-primary"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div></div>;
+            }
+
+            return (
+                <div className="text-slate-800 dark:text-slate-200 font-sans h-screen w-full overflow-hidden">
+                    {appState === 'SETUP' && <SetupScreen config={config} setConfig={setConfig} setAppState={setAppState} showToast={showToast} lang={lang} setLang={setLang} t={t} apiCall={apiCall} />}
+                    {appState === 'LOGIN' && <LoginScreen config={config} setCurrentUser={setCurrentUser} setAppState={setAppState} showToast={showToast} lang={lang} setLang={setLang} t={t} hashPassword={hashPassword} apiCall={apiCall} />}
+                    {appState === 'USER_DASHBOARD' && <UserDashboard config={config} currentUser={currentUser} users={users} tickets={tickets} setTickets={setTickets} settings={settings} loadData={loadData} showToast={showToast} lang={lang} setLang={setLang} t={t} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} handleLogout={handleLogout} apiCall={apiCall} PRIORITIES={PRIORITIES} />}
+                    {appState === 'ADMIN_DASHBOARD' && <AdminDashboard config={config} currentUser={currentUser} users={users} tickets={tickets} setTickets={setTickets} settings={settings} setSettings={setSettings} loadData={loadData} showToast={showToast} lang={lang} setLang={setLang} t={t} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} handleLogout={handleLogout} apiCall={apiCall} TICKET_STATUSES={TICKET_STATUSES} hashPassword={hashPassword} />}
+
+                    {/* Global loading indicator overlay */}
+                    {isLoading && currentUser && (
+                        <div className="fixed top-4 right-4 z-50 bg-white/80 dark:bg-slate-800/80 backdrop-blur px-3 py-1.5 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-xs font-medium fade-in">
+                            <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></div> Syncing...
+                        </div>
+                    )}
+
+                    {renderToast()}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
+
