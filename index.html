@@ -797,7 +797,7 @@
                                             <div>
                                                 <label className="text-slate-500 block mb-1">Assignee (Tim)</label>
                                                 <CustomDropdown
-                                                    options={[{ label: '-- Belum ada Assignee --', value: '' }, ...users.filter(u => u.role === 'Tim IT' || u.role === 'Admin').map(u => ({ label: u.name, value: u.name }))]}
+                                                    options={[{ label: '-- Belum ada Assignee --', value: '' }, ...users.filter(u => u.role === 'Tim IT').map(u => ({ label: u.name, value: u.name }))]}
                                                     value={editForm.assignee}
                                                     onChange={val => {
                                                         let newStatus = editForm.status;
