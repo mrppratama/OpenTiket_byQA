@@ -1167,7 +1167,7 @@
         };
 
         // ADMIN DASHBOARD
-        const AdminDashboard = ({ config, currentUser, users, tickets, setTickets, settings, setSettings, loadData, showToast, isDarkMode, setIsDarkMode, handleLogout, apiCall, TICKET_STATUSES, hashPassword, lang, setLang, t }) => {
+        const AdminDashboard = ({ config, currentUser, users, setUsers, tickets, setTickets, settings, setSettings, loadData, showToast, isDarkMode, setIsDarkMode, handleLogout, apiCall, TICKET_STATUSES, hashPassword, lang, setLang, t }) => {
             const [view, setView] = useState('BOARD'); // BOARD, USERS
             const [search, setSearch] = useState('');
             const [dateFilterType, setDateFilterType] = useState('ALL');
@@ -1806,7 +1806,7 @@
                     {appState === 'SETUP' && <SetupScreen config={config} setConfig={setConfig} setAppState={setAppState} showToast={showToast} lang={lang} setLang={setLang} t={t} apiCall={apiCall} />}
                     {appState === 'LOGIN' && <LoginScreen config={config} setCurrentUser={setCurrentUser} setAppState={setAppState} showToast={showToast} lang={lang} setLang={setLang} t={t} hashPassword={hashPassword} apiCall={apiCall} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />}
                     {appState === 'USER_DASHBOARD' && <UserDashboard config={config} currentUser={currentUser} users={users} tickets={tickets} setTickets={setTickets} settings={settings} loadData={loadData} showToast={showToast} lang={lang} setLang={setLang} t={t} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} handleLogout={handleLogout} apiCall={apiCall} PRIORITIES={PRIORITIES} />}
-                    {appState === 'ADMIN_DASHBOARD' && <AdminDashboard config={config} currentUser={currentUser} users={users} tickets={tickets} setTickets={setTickets} settings={settings} setSettings={setSettings} loadData={loadData} showToast={showToast} lang={lang} setLang={setLang} t={t} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} handleLogout={handleLogout} apiCall={apiCall} TICKET_STATUSES={TICKET_STATUSES} hashPassword={hashPassword} />}
+                    {appState === 'ADMIN_DASHBOARD' && <AdminDashboard config={config} currentUser={currentUser} users={users} setUsers={setUsers} tickets={tickets} setTickets={setTickets} settings={settings} setSettings={setSettings} loadData={loadData} showToast={showToast} lang={lang} setLang={setLang} t={t} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} handleLogout={handleLogout} apiCall={apiCall} TICKET_STATUSES={TICKET_STATUSES} hashPassword={hashPassword} />}
 
                     {/* Global loading indicator overlay */}
                     {isLoading && currentUser && (
