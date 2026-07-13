@@ -110,6 +110,7 @@
 
         .fade-in {
             animation: fadeIn 0.3s ease-in-out;
+            will-change: transform, opacity;
         }
 
         @keyframes fadeIn {
@@ -124,17 +125,34 @@
             }
         }
 
+        @keyframes shakeError {
+            0%   { transform: translateX(0); border-color: #ef4444; }
+            15%  { transform: translateX(-6px); border-color: #ef4444; }
+            30%  { transform: translateX(6px); border-color: #ef4444; }
+            45%  { transform: translateX(-4px); border-color: #ef4444; }
+            60%  { transform: translateX(4px); border-color: #ef4444; }
+            75%  { transform: translateX(-2px); border-color: #ef4444; }
+            100% { transform: translateX(0); border-color: #ef4444; }
+        }
+
+        .field-error {
+            animation: shakeError 0.45s ease;
+            border: 2px solid #ef4444 !important;
+            border-radius: 0.75rem;
+            will-change: transform;
+        }
+
         .glass-panel {
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(12px);
-            border: 2px solid #E2E8F0;
+            border: 1px solid #E2E8F0;
             border-radius: 12px;
             box-shadow: 4px 4px 0px 0px rgba(226, 232, 240, 0.8);
         }
 
         .dark .glass-panel {
             background: rgba(30, 35, 40, 0.9);
-            border: 2px solid #334155;
+            border: 1px solid #334155;
             box-shadow: 4px 4px 0px 0px rgba(15, 23, 42, 0.8);
         }
 
@@ -142,7 +160,7 @@
         input,
         textarea,
         select {
-            border: 2px solid #E2E8F0 !important;
+            border: 1px solid #E2E8F0 !important;
             border-radius: 8px !important;
             transition: all 0.3s ease !important;
         }
@@ -151,7 +169,7 @@
         textarea:focus,
         select:focus {
             border-color: #007FFF !important;
-            box-shadow: 4px 4px 0px 0px rgba(0, 127, 255, 0.15) !important;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
             outline: none !important;
         }
 
@@ -192,7 +210,17 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+        // --- DEBOUNCE HOOK ---
+        function useDebounce(value, delay) {
+            const [debouncedValue, setDebouncedValue] = React.useState(value);
+            useEffect(() => {
+                const timer = setTimeout(() => setDebouncedValue(value), delay);
+                return () => clearTimeout(timer);
+            }, [value, delay]);
+            return debouncedValue;
+        }
 
         // --- ICON HELPER ---
         const Icon = ({ name, size = 20, color = "currentColor", strokeWidth = 1.5, className = "" }) => {
@@ -431,7 +459,7 @@
 
             return (
                 <div className="min-h-screen flex items-center justify-center p-4">
-                    <div className="bg-[#F4F6F6] dark:bg-slate-800 p-8 rounded-2xl shadow-bauhaus w-full max-w-md fade-in border-2 border-slate-200 dark:border-slate-700">
+                    <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-none w-full max-w-md fade-in border-2 border-slate-200 dark:border-slate-700">
                         <div className="flex justify-center mb-6">
                             <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/50 text-primary rounded-2xl flex items-center justify-center">
                                 <Icon name="settings" size={32} />
@@ -489,14 +517,14 @@
 
             return (
                 <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-                    <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-6 right-6 z-50 p-2.5 rounded-xl bg-[#F4F6F6]/80 dark:bg-slate-800/80 backdrop-blur-md text-slate-600 dark:text-slate-300 shadow-bauhaus border-2 border-slate-200 dark:border-slate-700 hover:bg-primary/10 transition">
+                    <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-6 right-6 z-50 p-2.5 rounded-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-slate-600 dark:text-slate-300 shadow-none border border-slate-200 dark:border-slate-700 hover:bg-primary/10 transition">
                         {isDarkMode ? <Icon name="sun" size={20} /> : <Icon name="moon" size={20} />}
                     </button>
                     {/* Decorative Background */}
                     <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/20 rounded-full blur-3xl"></div>
                     <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-primary/20 rounded-full blur-3xl"></div>
 
-                    <div className="bg-[#F4F6F6]/90 dark:bg-slate-800/90 backdrop-blur-xl p-8 rounded-2xl shadow-[6px_6px_0px_0px_rgba(77,161,201,0.25)] w-full max-w-md z-10 fade-in border-2 border-slate-200/50 dark:border-slate-700/50">
+                    <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl p-8 rounded-2xl shadow-none w-full max-w-md z-10 fade-in border border-slate-200 dark:border-slate-700">
                         <div className="flex justify-center mb-6">
                             <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary/20 to-primary/40 flex items-center justify-center text-primary">
                                 <Icon name="shield-check" size={36} />
@@ -514,13 +542,13 @@
                         }} noValidate className="space-y-5">
                             <div>
                                 <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Username</label>
-                                <input required type="text" className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-[#F4F6F6]/50 dark:bg-slate-900/50 focus:ring-2 focus:ring-[#4DA1C9] focus:border-[#4DA1C9] outline-none transition" value={username} onChange={e => setUsername(e.target.value)} />
+                                <input required type="text" className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-900/50 focus:ring-2 focus:ring-[#4DA1C9] focus:border-[#4DA1C9] outline-none transition" value={username} onChange={e => setUsername(e.target.value)} />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Password</label>
-                                <input required type="password" className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-[#F4F6F6]/50 dark:bg-slate-900/50 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition" value={password} onChange={e => setPassword(e.target.value)} />
+                                <input required type="password" className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-900/50 focus:ring-2 focus:ring-primary focus:border-primary outline-none transition" value={password} onChange={e => setPassword(e.target.value)} />
                             </div>
-                            <button type="submit" disabled={loginLoading} className="w-full bg-primary hover:bg-primaryHover shadow-bauhaus  text-white font-medium py-3 rounded-xl transition-all active:scale-95 flex justify-center items-center gap-2">
+                            <button type="submit" disabled={loginLoading} className="w-full bg-primary hover:bg-primaryHover shadow-none  text-white font-medium py-3 rounded-xl transition-all active:scale-95 flex justify-center items-center gap-2">
                                 {loginLoading ? 'Memverifikasi...' : 'Login'}
                             </button>
                         </form>
@@ -559,11 +587,11 @@
                         <Icon name="chevron-down" size={14} className={`hidden md:block transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                     </div>
                     {isOpen && (
-                        <ul className="absolute z-50 bottom-full left-0 mb-2 w-full min-w-[150px] bg-[#F4F6F6] dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl shadow-bauhaus overflow-hidden py-1 fade-in">
+                        <ul className="absolute z-50 bottom-full left-0 mb-2 w-full min-w-[150px] bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl shadow-none overflow-hidden py-1 fade-in">
                             {options.map(opt => (
                                 <li
                                     key={opt.value}
-                                    className={`px-4 py-2 text-sm cursor-pointer hover:bg-[#F4F6F6] dark:hover:bg-slate-700 ${lang === opt.value ? 'text-primary font-bold bg-primary/5 dark:bg-primary/10' : 'text-slate-600 dark:text-slate-300'}`}
+                                    className={`px-4 py-2 text-sm cursor-pointer hover:bg-white dark:hover:bg-slate-700 ${lang === opt.value ? 'text-primary font-bold bg-primary/5 dark:bg-primary/10' : 'text-slate-600 dark:text-slate-300'}`}
                                     onClick={() => { setLang(opt.value); setIsOpen(false); }}
                                 >
                                     {opt.label}
@@ -606,7 +634,7 @@
                         <Icon name="chevron-down" size={16} className={`transition-transform ${isOpen ? 'rotate-180 text-primary' : 'text-current opacity-70'}`} />
                     </div>
                     {isOpen && !disabled && (
-                        <ul className="absolute z-50 w-full mt-2 bg-[#F4F6F6] dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl shadow-bauhaus max-h-60 overflow-y-auto py-1 fade-in">
+                        <ul className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl shadow-none max-h-60 overflow-y-auto py-1 fade-in">
                             {options.map((opt, i) => {
                                 const optValue = typeof opt === 'object' ? opt.value : opt;
                                 const optLabel = typeof opt === 'object' ? opt.label : opt;
@@ -614,7 +642,7 @@
                                 return (
                                     <li
                                         key={i}
-                                        className={`px-4 py-2.5 cursor-pointer text-sm flex items-center justify-between transition-colors ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-[#F4F6F6] dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}`}
+                                        className={`px-4 py-2.5 cursor-pointer text-sm flex items-center justify-between transition-colors ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-white dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}`}
                                         onClick={() => {
                                             onChange(optValue);
                                             setIsOpen(false);
@@ -711,7 +739,7 @@
 
             return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 fade-in">
-                    <div className="bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,127,255,0.25)] w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-none border border-slate-200 dark:border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col">
                         <div className="flex justify-between items-center p-6 border-b-2 border-slate-200 dark:border-slate-700 sticky top-0 bg-[#E6F2FF] dark:bg-[#183A62] z-10 rounded-t-2xl">
                             <div>
                                 <div className="flex items-center gap-2">
@@ -743,7 +771,7 @@
                                 </div>
                                 <div>
                                     <h4 className="text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wider">Detail Lengkap</h4>
-                                    <div className="bg-[#F4F6F6] dark:bg-slate-900/50 p-4 rounded-xl text-sm whitespace-pre-wrap">
+                                    <div className="text-sm whitespace-pre-wrap text-slate-700 dark:text-slate-300 mt-2 p-3 rounded-lg bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 min-h-[3rem]">
                                         {ticket.detail}
                                     </div>
                                 </div>
@@ -751,7 +779,7 @@
                                 {ticket.attachment && (
                                     <div>
                                         <h4 className="text-sm font-semibold text-slate-500 mb-2 uppercase tracking-wider">Lampiran</h4>
-                                        <div className="border-2 border-slate-200 dark:border-slate-700 rounded-xl p-2 bg-[#F4F6F6] dark:bg-slate-900/50 overflow-hidden flex justify-center">
+                                        <div className="border-2 border-slate-200 dark:border-slate-700 rounded-xl p-2 bg-white dark:bg-slate-900/50 overflow-hidden flex justify-center">
                                             {isImage ? (
                                                 <img src={ticket.attachment} alt="Lampiran" className="max-h-64 object-contain rounded-lg" />
                                             ) : isVideo ? (
@@ -860,8 +888,9 @@
             const [view, setView] = useState('HISTORY'); // FORM, HISTORY, TRACK
             const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
             const [isSubmitting, setIsSubmitting] = useState(false);
-            const [form, setForm] = useState({ app: '', category: settings.categories && settings.categories.length > 0 ? settings.categories[0] : 'Bug', priority: 'Medium', problem: '', detail: '' });
+            const [form, setForm] = useState({ app: '', category: '', priority: '', problem: '', detail: '' });
             const [file, setFile] = useState(null);
+            const [invalidFields, setInvalidFields] = useState({});
 
             const [search, setSearch] = useState('');
             const [dateFilterType, setDateFilterType] = useState('ALL');
@@ -901,9 +930,19 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (!form.app || !form.problem || !form.detail) {
-                    showToast('Harap lengkapi semua kolom wajib!', 'error');
-                    return;
+                const errors = {};
+                if (!form.app) errors.app = true;
+                if (!form.category) errors.category = true;
+                if (!form.priority) errors.priority = true;
+                if (!form.problem) errors.problem = true;
+                if (!form.detail) errors.detail = true;
+                if (Object.keys(errors).length > 0) {
+                    setInvalidFields(errors);
+                    setTimeout(() => setInvalidFields({}), 600);
+                    if (!form.app) { showToast('Harap pilih Aplikasi / Modul terlebih dahulu!', 'error'); return; }
+                    if (!form.category) { showToast('Harap pilih Kategori terlebih dahulu!', 'error'); return; }
+                    if (!form.priority) { showToast('Harap pilih Keutamaan (Priority) terlebih dahulu!', 'error'); return; }
+                    showToast('Harap lengkapi Ringkasan dan Detail Masalah!', 'error'); return;
                 }
                 setIsSubmitting(true);
                 try {
@@ -929,7 +968,7 @@
                     const savedTicket = await apiCall(config, 'saveTicket', { ticket: newTicket, user: currentUser });
                     setTickets(prev => [savedTicket, ...prev]);
                     showToast('Tiket berhasil dibuat!', 'success');
-                    setForm({ app: '', category: settings.categories && settings.categories.length > 0 ? settings.categories[0] : 'Bug', priority: 'Medium', problem: '', detail: '' });
+                    setForm({ app: '', category: '', priority: '', problem: '', detail: '' });
                     setFile(null);
                     setView('HISTORY');
                 } catch (error) {
@@ -945,7 +984,7 @@
                     <div className={`md:hidden fixed inset-0 bg-black/50 z-20 transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsMobileMenuOpen(false)}></div>
                     
                     {/* Sidebar */}
-                    <aside className={`fixed md:relative inset-y-0 left-0 w-64 bg-darkBg text-white flex flex-col transition-transform duration-300 z-30 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+                    <aside className={`fixed md:relative inset-y-0 left-0 w-64 bg-slate-900 text-slate-300 border-r border-slate-800 flex flex-col transition-transform duration-300 z-30 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
                         <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 shrink-0">
                             <div className="flex flex-row items-center">
                                 <Icon name="shield-check" size={36} className="text-primary" />
@@ -959,10 +998,10 @@
                             </button>
                         </div>
                         <nav className="p-4 flex-1 space-y-1">
-                            <button onClick={() => { setView('HISTORY'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'HISTORY' ? 'bg-primary text-white shadow-bauhaus ' : 'text-slate-400 hover:text-white hover:bg-primary/20 hover:text-primary'}`}>
+                            <button onClick={() => { setView('HISTORY'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'HISTORY' ? 'bg-primary text-white shadow-none ' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors'}`}>
                                 <Icon name="clock" size={20} /> <span className="font-medium">{t(lang, 'history')}</span>
                             </button>
-                            <button onClick={() => { setView('FORM'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'FORM' ? 'bg-primary text-white shadow-bauhaus ' : 'text-slate-400 hover:text-white hover:bg-primary/20 hover:text-primary'}`}>
+                            <button onClick={() => { setView('FORM'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'FORM' ? 'bg-primary text-white shadow-none ' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors'}`}>
                                 <Icon name="plus" size={20} /> <span className="font-medium">{t(lang, 'createTicket')}</span>
                             </button>
                         </nav>
@@ -985,7 +1024,7 @@
                     {/* Content */}
                     <main className="flex-1 flex flex-col h-screen overflow-hidden bg-white dark:bg-slate-900">
                         {/* Header */}
-                        <header className="min-h-[4rem] h-auto py-3 md:py-0 md:h-16 bg-[#F4F6F6] dark:bg-slate-800 border-b-2 border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-center justify-between px-4 md:px-6 shrink-0 z-10 gap-3 md:gap-0">
+                        <header className="min-h-[4rem] h-auto py-3 md:py-0 md:h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 dark:border-slate-700 flex flex-col md:flex-row items-center justify-between px-4 md:px-6 shrink-0 z-10 gap-3 md:gap-0">
                             <div className="flex items-center w-full md:w-auto gap-3">
                                 <div className="flex items-center gap-2 cursor-pointer md:cursor-auto active:opacity-70 transition" onClick={() => setIsMobileMenuOpen(true)} title="Tap to open menu">
                                     <Icon name={view === 'HISTORY' ? 'clock' : 'plus'} size={24} className="text-primary" />
@@ -1021,7 +1060,7 @@
                                                 {(customDateStart || customDateEnd) && <button onClick={() => {setCustomDateStart(''); setCustomDateEnd('')}} className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"><Icon name="x" size={16} /></button>}
                                             </div>
                                         )}
-                                        <button onClick={() => setView('FORM')} className="bg-primary hover:bg-primaryHover text-white px-3 md:px-4 py-2 rounded-full text-sm font-medium flex items-center justify-center gap-2 shadow-bauhaus flex-1 sm:flex-none">
+                                        <button onClick={() => setView('FORM')} className="bg-primary hover:bg-primaryHover text-white px-3 md:px-4 py-2 rounded-full text-sm font-medium flex items-center justify-center gap-2 shadow-none flex-1 sm:flex-none">
                                             <Icon name="plus" size={16} /> <span>{t(lang, 'createNew')}</span>
                                         </button>
                                     </>
@@ -1034,12 +1073,12 @@
                                         )}
                                     </div>
                                     {isNotifOpen && (
-                                        <div className="absolute right-0 mt-2 w-72 bg-[#F4F6F6] dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl shadow-bauhaus z-50 fade-in">
+                                        <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl shadow-none z-50 fade-in">
                                             <div className="p-3 border-b border-slate-100 dark:border-slate-700 font-bold">{t(lang, 'newNotif')}</div>
                                             <div className="max-h-64 overflow-y-auto">
                                                 {notifTickets.length > 0 ? (
                                                     notifTickets.map(t => (
-                                                        <div key={t.id} onClick={() => { setSelectedTicket(t); setIsNotifOpen(false); }} className="p-3 hover:bg-[#F4F6F6] dark:hover:bg-slate-700 cursor-pointer border-b border-slate-100 dark:border-slate-700/50 transition">
+                                                        <div key={t.id} onClick={() => { setSelectedTicket(t); setIsNotifOpen(false); }} className="p-3 hover:bg-white dark:hover:bg-slate-700 cursor-pointer border-b border-slate-100 dark:border-slate-700/50 transition">
                                                             <div className="text-sm font-bold text-primary mb-1">{t.id}</div>
                                                             <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-1 mb-1">{t.status === 'Open' ? 'Tiket berhasil dibuat' : 'Status update: ' + t.status}</div>
                                                             <div className="text-[10px] text-slate-400">{new Date(t.date).toLocaleDateString('id-ID')}</div>
@@ -1058,49 +1097,55 @@
                         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
                             <div className="mx-auto w-full">
                                 {view === 'FORM' && (
-                                    <div className="bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl shadow-bauhaus border-2 border-slate-200 dark:border-slate-700 p-4 md:p-8 fade-in">
+                                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-none border border-slate-200 dark:border-slate-700 p-4 md:p-8 fade-in">
                                         <h2 className="text-2xl font-bold mb-6">{t(lang, 'createNew')}</h2>
                                         <form onSubmit={handleSubmit} noValidate className="space-y-6">
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                 <div>
                                                     <label className="block text-sm font-medium mb-1">{t(lang, 'appModule')}</label>
+                                                    <div className={invalidFields.app ? 'field-error' : ''}>
                                                     <CustomDropdown
                                                         options={[{ label: t(lang, 'selectApp'), value: '' }, ...settings.apps.map(a => ({ label: a, value: a }))]}
                                                         value={form.app}
                                                         onChange={val => setForm({ ...form, app: val })}
                                                     />
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium mb-1">Kategori</label>
+                                                    <div className={invalidFields.category ? 'field-error' : ''}>
                                                     <CustomDropdown
-                                                        options={(settings.categories || ['Bug', 'Task', 'Feature']).map(c => ({ label: c, value: c }))}
+                                                        options={[{ label: '-- Silahkan Pilih --', value: '' }, ...(settings.categories || ['Bug', 'Task', 'Feature']).map(c => ({ label: c, value: c }))]}
                                                         value={form.category}
                                                         onChange={val => setForm({ ...form, category: val })}
                                                     />
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium mb-1">{t(lang, 'priority')}</label>
+                                                    <div className={invalidFields.priority ? 'field-error' : ''}>
                                                     <CustomDropdown
-                                                        options={settings.priorities.map(p => ({ label: p, value: p }))}
+                                                        options={[{ label: '-- Silahkan Pilih --', value: '' }, ...settings.priorities.map(p => ({ label: p, value: p }))]}
                                                         value={form.priority}
                                                         onChange={val => setForm({ ...form, priority: val })}
                                                     />
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium mb-1">Ringkasan Masalah</label>
-                                                <input required type="text" className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={form.problem} onChange={e => setForm({ ...form, problem: e.target.value })} placeholder="Singkat dan jelas" />
+                                                <input required type="text" className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none ${invalidFields.problem ? 'field-error' : ''}`} value={form.problem} onChange={e => setForm({ ...form, problem: e.target.value })} placeholder="Singkat dan jelas" />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium mb-1">Detail Lengkap</label>
-                                                <textarea required rows="5" className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={form.detail} onChange={e => setForm({ ...form, detail: e.target.value })} placeholder="Jelaskan langkah-langkah, ekspektasi, dan hasil aktual..."></textarea>
+                                                <textarea required rows="5" className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none ${invalidFields.detail ? 'field-error' : ''}`} value={form.detail} onChange={e => setForm({ ...form, detail: e.target.value })} placeholder="Jelaskan langkah-langkah, ekspektasi, dan hasil aktual..."></textarea>
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium mb-1">{t(lang, 'attachment')}</label>
                                                 <input type="file" accept="image/*,video/*" onChange={e => setFile(e.target.files[0])} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-primary hover:file:bg-blue-100 transition cursor-pointer" />
                                             </div>
                                             <div className="pt-4 border-t-2 border-slate-200 dark:border-slate-700 flex justify-end">
-                                                <button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primaryHover text-white px-6 py-2.5 rounded-xl font-medium shadow-bauhaus  transition-all flex items-center gap-2">
+                                                <button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primaryHover text-white px-6 py-2.5 rounded-xl font-medium shadow-none  transition-all flex items-center gap-2">
                                                     {isSubmitting ? 'Mengirim...' : <><Icon name="check" size={18} /> {t(lang, 'submitTicket')}</>}
                                                 </button>
                                             </div>
@@ -1112,7 +1157,7 @@
                                     <div className="fade-in space-y-6">
 
                                         {myTickets.length === 0 ? (
-                                            <div className="text-center p-12 bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700">
+                                            <div className="text-center p-12 bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700">
                                                 <Icon name="file-text" size={48} className="mx-auto text-slate-300 mb-4" />
                                                 <p className="text-slate-500 mb-4">{t(lang, 'noTickets')}</p>
                                                 <button onClick={() => setView('FORM')} className="bg-primary/10 text-primary hover:bg-primary hover:text-white px-6 py-2.5 rounded-xl font-medium transition mx-auto inline-flex items-center gap-2">
@@ -1122,7 +1167,7 @@
                                         ) : (
                                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                                                 {myTickets.filter(t => t.id.toLowerCase().includes(search.toLowerCase()) || t.problem.toLowerCase().includes(search.toLowerCase()) || t.app.toLowerCase().includes(search.toLowerCase())).map(t => (
-                                                    <div key={t.id} onClick={() => setSelectedTicket(t)} className="bg-[#F4F6F6] dark:bg-slate-800 p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-bauhaus hover:shadow-bauhaus transition cursor-pointer flex flex-col h-full">
+                                                    <div key={t.id} onClick={() => setSelectedTicket(t)} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-none transition cursor-pointer flex flex-col h-full">
                                                         <div className="flex justify-between items-start mb-3">
                                                             <div className="flex items-center gap-2 flex-wrap">
                                                                 <span className="text-xs font-bold text-primary">{t.id}</span>
@@ -1192,8 +1237,9 @@
             const [userModalOpen, setUserModalOpen] = useState(false);
             const [userForm, setUserForm] = useState({ id: null, name: '', username: '', password: '', role: 'User', status: 'Active' });
             const [isSubmitting, setIsSubmitting] = useState(false);
-            const [form, setForm] = useState({ app: '', category: settings.categories && settings.categories.length > 0 ? settings.categories[0] : 'Bug', priority: 'Medium', problem: '', detail: '' });
+            const [form, setForm] = useState({ app: '', category: '', priority: '', problem: '', detail: '' });
             const [file, setFile] = useState(null);
+            const [invalidFields, setInvalidFields] = useState({});
 
             // Notification
             const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -1250,9 +1296,19 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (!form.app || !form.problem || !form.detail) {
-                    showToast('Harap lengkapi semua kolom wajib!', 'error');
-                    return;
+                const errors = {};
+                if (!form.app) errors.app = true;
+                if (!form.category) errors.category = true;
+                if (!form.priority) errors.priority = true;
+                if (!form.problem) errors.problem = true;
+                if (!form.detail) errors.detail = true;
+                if (Object.keys(errors).length > 0) {
+                    setInvalidFields(errors);
+                    setTimeout(() => setInvalidFields({}), 600);
+                    if (!form.app) { showToast('Harap pilih Aplikasi / Modul terlebih dahulu!', 'error'); return; }
+                    if (!form.category) { showToast('Harap pilih Kategori terlebih dahulu!', 'error'); return; }
+                    if (!form.priority) { showToast('Harap pilih Keutamaan (Priority) terlebih dahulu!', 'error'); return; }
+                    showToast('Harap lengkapi Ringkasan dan Detail Masalah!', 'error'); return;
                 }
                 setIsSubmitting(true);
                 try {
@@ -1278,7 +1334,7 @@
                     const savedTicket = await apiCall(config, 'saveTicket', { ticket: newTicket, user: currentUser });
                     setTickets(prev => [savedTicket, ...prev]);
                     showToast('Tiket berhasil dibuat!', 'success');
-                    setForm({ app: '', category: settings.categories && settings.categories.length > 0 ? settings.categories[0] : 'Bug', priority: 'Medium', problem: '', detail: '' });
+                    setForm({ app: '', category: '', priority: '', problem: '', detail: '' });
                     setFile(null);
                     setView('BOARD');
                 } catch (error) {
@@ -1298,10 +1354,11 @@
                     });
             }, [tickets, currentUser.role, currentUser.name, dateFilterType, customDateStart, customDateEnd]);
 
+            const debouncedSearch = useDebounce(search, 250);
             const filteredTickets = useMemo(() => {
-                const s = search.toLowerCase();
+                const s = debouncedSearch.toLowerCase();
                 return roleFilteredTickets.filter(t => (t.id || '').toLowerCase().includes(s) || (t.problem || '').toLowerCase().includes(s) || (t.app || '').toLowerCase().includes(s));
-            }, [roleFilteredTickets, search]);
+            }, [roleFilteredTickets, debouncedSearch]);
 
             const notifTickets = useMemo(() => roleFilteredTickets.filter(t => t.status !== 'Done'), [roleFilteredTickets]);
 
@@ -1311,8 +1368,8 @@
                     <div className={`md:hidden fixed inset-0 bg-black/50 z-20 transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsMobileMenuOpen(false)}></div>
                     
                     {/* Sidebar */}
-                    <aside className={`fixed md:relative inset-y-0 left-0 w-64 bg-darkBg text-white flex flex-col transition-transform duration-300 z-30 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-                        <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 shrink-0">
+                    <aside className={`fixed md:relative inset-y-0 left-0 w-64 bg-slate-900 text-slate-300 border-r border-slate-800 flex flex-col transition-transform duration-300 z-30 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+                        <div className="h-16 md:h-20 flex items-center justify-between px-6 border-b border-white/10 shrink-0">
                             <div className="flex flex-row items-center">
                                 <Icon name="shield-check" size={36} className="text-primary" />
                                 <div className="flex flex-col ml-3">
@@ -1325,21 +1382,21 @@
                             </button>
                         </div>
                         <nav className="flex-1 py-4 space-y-1 px-2 md:px-4">
-                            <button onClick={() => { setView('BOARD'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'BOARD' ? 'bg-primary text-white shadow-bauhaus ' : 'text-slate-400 hover:text-white hover:bg-primary/20 hover:text-primary'}`}>
+                            <button onClick={() => { setView('BOARD'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'BOARD' ? 'bg-primary text-white shadow-none ' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors'}`}>
                                 <Icon name="layout-dashboard" size={20} />
                                 <span className="font-medium">{t(lang, "kanbanBoard")}</span>
                             </button>
                             {currentUser.role === 'Admin' && (
                                 <>
-                                    <button onClick={() => { setView('FORM'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'FORM' ? 'bg-primary text-white shadow-bauhaus ' : 'text-slate-400 hover:text-white hover:bg-primary/20 hover:text-primary'}`}>
+                                    <button onClick={() => { setView('FORM'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'FORM' ? 'bg-primary text-white shadow-none ' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors'}`}>
                                         <Icon name="plus" size={20} />
                                         <span className="font-medium">{t(lang, "createTicket")}</span>
                                     </button>
-                                    <button onClick={() => { setView('USERS'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'USERS' ? 'bg-primary text-white shadow-bauhaus ' : 'text-slate-400 hover:text-white hover:bg-primary/20 hover:text-primary'}`}>
+                                    <button onClick={() => { setView('USERS'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'USERS' ? 'bg-primary text-white shadow-none ' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors'}`}>
                                         <Icon name="users" size={20} />
                                         <span className="font-medium">{t(lang, "manageUsers")}</span>
                                     </button>
-                                    <button onClick={() => { setView('SETTINGS'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'SETTINGS' ? 'bg-primary text-white shadow-bauhaus ' : 'text-slate-400 hover:text-white hover:bg-primary/20 hover:text-primary'}`}>
+                                    <button onClick={() => { setView('SETTINGS'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${view === 'SETTINGS' ? 'bg-primary text-white shadow-none ' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors'}`}>
                                         <Icon name="settings" size={20} />
                                         <span className="font-medium">{t(lang, "settings")}</span>
                                     </button>
@@ -1365,7 +1422,7 @@
                     {/* Content */}
                     <main className="flex-1 flex flex-col h-screen overflow-hidden bg-white dark:bg-slate-900">
                         {/* Header */}
-                        <header className="min-h-[4rem] h-auto py-3 md:py-0 md:h-16 bg-[#F4F6F6] dark:bg-slate-800 border-b-2 border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-center justify-between px-4 md:px-6 shrink-0 z-10 gap-3 md:gap-0">
+                        <header className="min-h-[4rem] h-auto py-3 md:py-0 md:h-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-center justify-between px-4 md:px-8 shrink-0 z-40 gap-4">
                             <div className="flex items-center w-full md:w-auto gap-3">
                                 <div className="flex items-center gap-2 cursor-pointer md:cursor-auto active:opacity-70 transition" onClick={() => setIsMobileMenuOpen(true)} title="Tap to open menu">
                                     <Icon name={view === 'BOARD' ? 'layout-dashboard' : view === 'USERS' ? 'users' : view === 'FORM' ? 'plus' : 'settings'} size={24} className="text-primary" />
@@ -1404,7 +1461,7 @@
                                     </>
                                 )}
                                 {view === 'USERS' && (
-                                    <button onClick={() => { setUserForm({ id: null, name: '', username: '', password: '', role: 'User', status: 'Active' }); setUserModalOpen(true); }} className="bg-primary hover:bg-primaryHover text-white px-3 md:px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-bauhaus flex-1 sm:flex-none">
+                                    <button onClick={() => { setUserForm({ id: null, name: '', username: '', password: '', role: 'User', status: 'Active' }); setUserModalOpen(true); }} className="bg-primary hover:bg-primaryHover text-white px-3 md:px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 shadow-none flex-1 sm:flex-none">
                                         <Icon name="plus" size={16} /> <span>{t(lang, 'addUser')}</span>
                                     </button>
                                 )}
@@ -1416,12 +1473,12 @@
                                         )}
                                     </div>
                                     {isNotifOpen && (
-                                        <div className="absolute right-0 mt-2 w-72 bg-[#F4F6F6] dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl shadow-bauhaus z-50 fade-in">
+                                        <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl shadow-none z-50 fade-in">
                                             <div className="p-3 border-b border-slate-100 dark:border-slate-700 font-bold">{t(lang, 'newNotif')}</div>
                                             <div className="max-h-64 overflow-y-auto">
                                                 {notifTickets.length > 0 ? (
                                                     notifTickets.map(t => (
-                                                        <div key={t.id} onClick={() => { setSelectedTicket(t); setIsNotifOpen(false); }} className="p-3 hover:bg-[#F4F6F6] dark:hover:bg-slate-700 cursor-pointer border-b border-slate-100 dark:border-slate-700/50 transition">
+                                                        <div key={t.id} onClick={() => { setSelectedTicket(t); setIsNotifOpen(false); }} className="p-3 hover:bg-white dark:hover:bg-slate-700 cursor-pointer border-b border-slate-100 dark:border-slate-700/50 transition">
                                                             <div className="text-sm font-bold text-primary mb-1">{t.id}</div>
                                                             <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-1 mb-1">
                                                                 {currentUser.role === 'Tim IT'
@@ -1453,7 +1510,7 @@
                                             </div>
                                             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                                                 {filteredTickets.filter(t => t.status === status).map(t => (
-                                                    <div key={t.id} draggable onDragStart={(e) => handleDragStart(e, t.id)} onClick={() => setSelectedTicket(t)} className="bg-white dark:bg-slate-700 p-4 rounded-xl shadow-bauhaus border-2 border-slate-200 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:shadow-bauhaus transition group flex flex-col h-full">
+                                                    <div key={t.id} draggable onDragStart={(e) => handleDragStart(e, t.id)} onClick={() => setSelectedTicket(t)} className="bg-white dark:bg-slate-700 p-4 rounded-xl shadow-none border border-slate-200 dark:border-slate-700 cursor-grab active:cursor-grabbing hover:shadow-none transition group flex flex-col h-full">
                                                         <div className="flex justify-between items-start mb-2">
                                                             <div className="flex items-center gap-1.5 flex-wrap">
                                                                 <span className="text-xs font-bold text-primary">{t.id}</span>
@@ -1488,49 +1545,55 @@
                             )}
 
                             {view === 'FORM' && (
-                                <div className="bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl shadow-bauhaus border-2 border-slate-200 dark:border-slate-700 p-4 md:p-8 fade-in">
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-none border border-slate-200 dark:border-slate-700 p-4 md:p-8 fade-in">
                                     <h2 className="text-2xl font-bold mb-6">{t(lang, 'createNew')}</h2>
                                     <form onSubmit={handleSubmit} noValidate className="space-y-6">
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                             <div>
                                                 <label className="block text-sm font-medium mb-1">{t(lang, 'appModule')}</label>
+                                                <div className={invalidFields.app ? 'field-error' : ''}>
                                                 <CustomDropdown
                                                     options={[{ label: t(lang, 'selectApp'), value: '' }, ...settings.apps.map(a => ({ label: a, value: a }))]}
                                                     value={form.app}
                                                     onChange={val => setForm({ ...form, app: val })}
                                                 />
+                                                </div>
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium mb-1">Kategori</label>
+                                                <div className={invalidFields.category ? 'field-error' : ''}>
                                                 <CustomDropdown
-                                                    options={(settings.categories || ['Bug', 'Task', 'Feature']).map(c => ({ label: c, value: c }))}
+                                                    options={[{ label: '-- Silahkan Pilih --', value: '' }, ...(settings.categories || ['Bug', 'Task', 'Feature']).map(c => ({ label: c, value: c }))]}
                                                     value={form.category}
                                                     onChange={val => setForm({ ...form, category: val })}
                                                 />
+                                                </div>
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium mb-1">{t(lang, 'priority')}</label>
+                                                <div className={invalidFields.priority ? 'field-error' : ''}>
                                                 <CustomDropdown
-                                                    options={settings.priorities.map(p => ({ label: p, value: p }))}
+                                                    options={[{ label: '-- Silahkan Pilih --', value: '' }, ...settings.priorities.map(p => ({ label: p, value: p }))]}
                                                     value={form.priority}
                                                     onChange={val => setForm({ ...form, priority: val })}
                                                 />
+                                                </div>
                                             </div>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1">Ringkasan Masalah</label>
-                                            <input required type="text" className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={form.problem} onChange={e => setForm({ ...form, problem: e.target.value })} placeholder="Singkat dan jelas" />
+                                            <input required type="text" className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none ${invalidFields.problem ? 'field-error' : ''}`} value={form.problem} onChange={e => setForm({ ...form, problem: e.target.value })} placeholder="Singkat dan jelas" />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1">Detail Lengkap</label>
-                                            <textarea required rows="5" className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none" value={form.detail} onChange={e => setForm({ ...form, detail: e.target.value })} placeholder="Jelaskan langkah-langkah, ekspektasi, dan hasil aktual..."></textarea>
+                                            <textarea required rows="5" className={`w-full px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-transparent focus:ring-2 focus:ring-primary outline-none ${invalidFields.detail ? 'field-error' : ''}`} value={form.detail} onChange={e => setForm({ ...form, detail: e.target.value })} placeholder="Jelaskan langkah-langkah, ekspektasi, dan hasil aktual..."></textarea>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1">{t(lang, 'attachment')}</label>
                                             <input type="file" accept="image/*,video/*" onChange={e => setFile(e.target.files[0])} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-primary hover:file:bg-blue-100 transition cursor-pointer" />
                                         </div>
                                         <div className="pt-4 border-t-2 border-slate-200 dark:border-slate-700 flex justify-end">
-                                            <button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primaryHover text-white px-6 py-2.5 rounded-xl font-medium shadow-bauhaus transition-all flex items-center gap-2">
+                                            <button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primaryHover text-white px-6 py-2.5 rounded-xl font-medium shadow-none transition-all flex items-center gap-2">
                                                 {isSubmitting ? 'Mengirim...' : <><Icon name="check" size={18} /> {t(lang, 'submitTicket')}</>}
                                             </button>
                                         </div>
@@ -1539,7 +1602,7 @@
                             )}
 
                             {view === 'USERS' && (
-                                <div className="bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl shadow-bauhaus border-2 border-slate-200 dark:border-slate-700 overflow-y-auto max-h-[75vh] fade-in relative">
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-none border border-slate-200 dark:border-slate-700 overflow-y-auto max-h-[75vh] fade-in relative">
                                     <table className="w-full text-left border-collapse">
                                         <thead className="sticky top-0 z-10">
                                             <tr className="bg-[#DCEAF7] dark:bg-[#183A62] border-b-2 border-slate-200 dark:border-slate-700 text-xs uppercase tracking-wider text-slate-500">
@@ -1553,7 +1616,7 @@
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                             {users.map(u => (
-                                                <tr key={u.id} className="hover:bg-[#F4F6F6] dark:hover:bg-slate-800/50 transition">
+                                                <tr key={u.id} className="hover:bg-white dark:hover:bg-slate-800/50 transition">
                                                     <td className="p-4 font-medium">{u.name}</td>
                                                     <td className="p-4 text-slate-500">{u.username}</td>
                                                     <td className="p-4 text-center">
@@ -1587,7 +1650,7 @@
                             )}
 
                             {view === 'SETTINGS' && (
-                                <div className="bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl shadow-bauhaus border-2 border-slate-200 dark:border-slate-700 p-6 fade-in space-y-10">
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-none border border-slate-200 dark:border-slate-700 p-6 fade-in space-y-10">
                                     <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-4 rounded-xl text-sm flex items-start gap-3">
                                         <Icon name="info" className="shrink-0 mt-0.5" size={18} />
                                         <p>Data di bawah ini digunakan untuk mengatur opsi Dropdown (Pilihan) pada form pembuatan dan pengeditan tiket. Tekan <strong>Enter</strong> pada kolom input untuk menambahkan opsi baru.</p>
@@ -1599,7 +1662,7 @@
 
                                             <div className="flex flex-wrap gap-2 mb-4">
                                                 {settings[key]?.map((item, idx) => (
-                                                    <div key={idx} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 px-3 py-1.5 rounded-lg text-sm font-medium shadow-bauhaus">
+                                                    <div key={idx} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium shadow-none">
                                                         <span>{item}</span>
                                                         <button onClick={async () => {
                                                             if (confirm(`Hapus "${item}" dari daftar?`)) {
@@ -1658,7 +1721,7 @@
 
                     {userModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 fade-in">
-                            <div className="bg-[#F4F6F6] dark:bg-slate-800 rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,127,255,0.25)] w-full max-w-md">
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-none border border-slate-200 dark:border-slate-700 w-full max-w-md">
                                 <div className="flex justify-between items-center p-6 border-b-2 border-slate-200 dark:border-slate-700 bg-[#E6F2FF] dark:bg-[#183A62] rounded-t-2xl">
                                     <h3 className="text-xl font-bold">{userForm.id ? 'Edit User' : t(lang, 'addUser')}</h3>
                                     <button onClick={() => setUserModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition"><Icon name="x" /></button>
@@ -1691,7 +1754,7 @@
                                         </div>
                                     </div>
                                     <div className="pt-4 flex justify-end">
-                                        <button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primaryHover text-white px-6 py-2.5 rounded-xl font-medium shadow-bauhaus transition-all flex items-center gap-2">
+                                        <button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primaryHover text-white px-6 py-2.5 rounded-xl font-medium shadow-none transition-all flex items-center gap-2">
                                             {isSubmitting ? 'Menyimpan...' : 'Simpan'}
                                         </button>
                                     </div>
@@ -1812,7 +1875,7 @@
                 if (!toast) return null;
                 return (
                     <div className="fixed bottom-6 right-6 z-50 fade-in">
-                        <div className={`px-4 py-3 rounded-xl shadow-bauhaus border flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400' : 'bg-[#F4F6F6] dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'}`}>
+                        <div className={`px-4 py-3 rounded-xl shadow-none border flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'}`}>
                             {toast.type === 'error' ? <div className="w-2 h-2 rounded-full bg-red-500"></div> : <div className="w-2 h-2 rounded-full bg-primary"></div>}
                             <span className="font-medium text-sm">{toast.message}</span>
                         </div>
@@ -1822,7 +1885,7 @@
 
             // Loading state overlay
             if (isLoading && !currentUser) {
-                return <div className="h-screen w-full flex items-center justify-center bg-[#F4F6F6] dark:bg-slate-900 text-primary"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div></div>;
+                return <div className="h-screen w-full flex items-center justify-center bg-white dark:bg-slate-900 text-primary"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div></div>;
             }
 
             return (
@@ -1834,7 +1897,7 @@
 
                     {/* Global loading indicator overlay */}
                     {isLoading && currentUser && (
-                        <div className="fixed top-4 right-4 z-50 bg-[#F4F6F6]/80 dark:bg-slate-800/80 backdrop-blur px-3 py-1.5 rounded-full shadow-bauhaus border-2 border-slate-200 dark:border-slate-700 flex items-center gap-2 text-xs font-medium fade-in">
+                        <div className="fixed top-4 right-4 z-50 bg-white/80 dark:bg-slate-800/80 backdrop-blur px-3 py-1.5 rounded-full shadow-none border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-xs font-medium fade-in">
                             <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></div> Syncing...
                         </div>
                     )}

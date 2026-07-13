@@ -211,12 +211,18 @@ function saveUser(ss, user) {
   }
 
   if (rowIndex > -1) {
-    // Update
-    sheet.getRange(rowIndex, 2).setValue(user.name);
-    sheet.getRange(rowIndex, 3).setValue(user.username);
-    if (user.password) sheet.getRange(rowIndex, 4).setValue(user.password);
-    sheet.getRange(rowIndex, 5).setValue(user.role);
-    sheet.getRange(rowIndex, 6).setValue(user.status);
+    // BATCH UPDATE user row
+    var newRow = [
+      data[rowIndex - 1][0], // User ID
+      user.name,
+      user.username,
+      user.password ? user.password : data[rowIndex - 1][3],
+      user.role,
+      user.status,
+      data[rowIndex - 1][6], // Created At
+      data[rowIndex - 1][7]  // Last Login
+    ];
+    sheet.getRange(rowIndex, 1, 1, newRow.length).setValues([newRow]);
   } else {
     // Insert
     user.id = 'U-' + Date.now();
@@ -250,6 +256,13 @@ function deleteUser(ss, userId) {
 // TICKETS
 // ----------------------------------------------------
 function getTickets(ss) {
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'tickets_' + ss.getId();
+  var cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
   var sheetT = ss.getSheetByName('Tickets');
   var sheetTl = ss.getSheetByName('Timeline');
   if(!sheetT) return [];
@@ -298,8 +311,11 @@ function getTickets(ss) {
   }
 
   // sort timeline descending
-  tickets.forEach(t => t.timeline.sort((a,b) => new Date(b.date) - new Date(a.date)));
-  
+  tickets.forEach(function(t) { t.timeline.sort(function(a,b) { return new Date(b.date) - new Date(a.date); }); });
+
+  // Cache for 2 minutes (max 100KB per entry)
+  try { cache.put(cacheKey, JSON.stringify(tickets), 120); } catch(e) {}
+
   return tickets;
 }
 
@@ -327,19 +343,28 @@ function saveTicket(ss, ticket, user) {
   var now = new Date().toISOString();
 
   if (rowIndex > -1) {
-    // Update
-    // ['Ticket ID', 'Tanggal Masuk', 'Reporter', 'Aplikasi', 'Priority', 'Masalah', 'Detail', 'Lampiran', 'Status', 'Assignee', 'Deadline', 'Last Update']
-    if(ticket.app !== undefined) sheet.getRange(rowIndex, 4).setValue(ticket.app);
-    if(ticket.priority !== undefined) sheet.getRange(rowIndex, 5).setValue(ticket.priority);
-    if(ticket.problem !== undefined) sheet.getRange(rowIndex, 6).setValue(ticket.problem);
-    if(ticket.detail !== undefined) sheet.getRange(rowIndex, 7).setValue(ticket.detail);
-    if(ticket.attachment !== undefined) sheet.getRange(rowIndex, 8).setValue(ticket.attachment);
-    if(ticket.status !== undefined) sheet.getRange(rowIndex, 9).setValue(ticket.status);
-    if(ticket.assignee !== undefined) sheet.getRange(rowIndex, 10).setValue(ticket.assignee);
-    if(ticket.deadline !== undefined) sheet.getRange(rowIndex, 11).setValue(ticket.deadline);
-    sheet.getRange(rowIndex, 12).setValue(now);
-    if(ticket.feedback !== undefined) sheet.getRange(rowIndex, 13).setValue(ticket.feedback);
-    if(ticket.category !== undefined) sheet.getRange(rowIndex, 14).setValue(ticket.category);
+    // --- BATCH UPDATE: build a full row and write at once ---
+    var existingRow = data[rowIndex - 1]; // rowIndex is 1-based, data is 0-based
+    var newRow = [
+      existingRow[0], // Ticket ID - unchanged
+      existingRow[1], // Date - unchanged
+      existingRow[2], // Reporter - unchanged
+      ticket.app      !== undefined ? ticket.app      : existingRow[3],
+      ticket.priority !== undefined ? ticket.priority : existingRow[4],
+      ticket.problem  !== undefined ? ticket.problem  : existingRow[5],
+      ticket.detail   !== undefined ? ticket.detail   : existingRow[6],
+      ticket.attachment !== undefined ? ticket.attachment : existingRow[7],
+      ticket.status   !== undefined ? ticket.status   : existingRow[8],
+      ticket.assignee !== undefined ? ticket.assignee : existingRow[9],
+      ticket.deadline !== undefined ? ticket.deadline : existingRow[10],
+      now, // Last Update always refreshed
+      ticket.feedback !== undefined ? ticket.feedback : (existingRow[12] || ''),
+      ticket.category !== undefined ? ticket.category : (existingRow[13] || 'Bug')
+    ];
+    sheet.getRange(rowIndex, 1, 1, newRow.length).setValues([newRow]);
+    
+    // Invalidate cache
+    try { CacheService.getScriptCache().remove('tickets_' + ss.getId()); } catch(e) {}
     
     // Check timeline events
     if (ticket.status && oldTicket.status !== ticket.status) {
@@ -390,6 +415,9 @@ function saveTicket(ss, ticket, user) {
     
     logTimeline(ss, ticket.id, 'Tiket dibuat', user.name, '');
     
+    // Invalidate cache on new ticket
+    try { CacheService.getScriptCache().remove('tickets_' + ss.getId()); } catch(e) {}
+    
     return {
       id: ticket.id,
       date: ticket.date,
@@ -420,9 +448,29 @@ function saveTicket(ss, ticket, user) {
 }
 
 function getTicketById(ss, id) {
-  var all = getTickets(ss);
-  for(var i=0; i<all.length; i++) {
-    if(all[i].id === id) return all[i];
+  // Read directly from sheet instead of re-loading all tickets
+  var sheetT = ss.getSheetByName('Tickets');
+  var sheetTl = ss.getSheetByName('Timeline');
+  if (!sheetT) return null;
+  var tData = sheetT.getDataRange().getValues();
+  var tlData = sheetTl ? sheetTl.getDataRange().getValues() : [];
+  var timelines = {};
+  for (var j = 1; j < tlData.length; j++) {
+    var tId = tlData[j][1];
+    if (!timelines[tId]) timelines[tId] = [];
+    timelines[tId].push({ id: tlData[j][0], ticketId: tId, date: tlData[j][2], activity: tlData[j][3], by: tlData[j][4], notes: tlData[j][5] });
+  }
+  for (var i = 1; i < tData.length; i++) {
+    if (tData[i][0] === id) {
+      var t = {
+        id: tData[i][0], date: tData[i][1], reporter: tData[i][2], app: tData[i][3],
+        priority: tData[i][4], problem: tData[i][5], detail: tData[i][6], attachment: tData[i][7],
+        status: tData[i][8], assignee: tData[i][9], deadline: tData[i][10], lastUpdate: tData[i][11],
+        feedback: tData[i][12] || '', category: tData[i][13] || 'Bug',
+        timeline: (timelines[id] || []).sort(function(a,b) { return new Date(b.date) - new Date(a.date); })
+      };
+      return t;
+    }
   }
   return null;
 }
